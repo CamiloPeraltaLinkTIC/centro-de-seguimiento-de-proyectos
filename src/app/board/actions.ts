@@ -2,12 +2,12 @@
 
 import { TASK_COLS } from "@/lib/gantt";
 import type { Frente, Responsable, Task, TaskInput } from "@/lib/gantt";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/session";
+import { db } from "@/lib/supabase/server";
 
 /*
  * Toda lectura y escritura del tablero pasa por aquí: el navegador no tiene acceso directo a Supabase.
- * Cada acción valida la sesión, el rol y los datos recibidos. La base de datos vuelve a verificar
- * el rol con RLS (defensa en profundidad).
+ * Cada acción valida la sesión firmada, el rol y los datos recibidos antes de tocar la base de datos.
  */
 
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -49,14 +49,9 @@ function parseTask(b: TaskInput): TaskInput | null {
 
 /* ---------- sesión y rol ---------- */
 async function session(requireAdmin: boolean) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  if (requireAdmin) {
-    const { data: p } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
-    if (p?.role !== "admin") return null;
-  }
-  return supabase;
+  const s = await getSession();
+  if (!s || (requireAdmin && s.role !== "admin")) return null;
+  return db();
 }
 
 /* ---------- lectura ---------- */

@@ -1,5 +1,5 @@
 -- Datos iniciales del tablero Gantt MATERAN (exportado 2026-10-01).
--- Generado por scripts/generate-seed.mjs. Ejecutar una sola vez, después de las migraciones.
+-- Generado por scripts/generate-seed.mjs. Ejecutar una sola vez, después de 0001_schema.sql.
 
 insert into public.frentes (nombre, color, orden) values
   ('Estrategia', '#2709CD', 1),

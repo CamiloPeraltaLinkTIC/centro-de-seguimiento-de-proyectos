@@ -1,39 +1,52 @@
 "use server";
 
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { checkCredentials, createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { db } from "@/lib/supabase/server";
 
 export type LoginState = { error: string };
 
-const GENERIC = "Contraseña incorrecta.";
+const GENERIC = "Usuario o contraseña incorrectos.";
+const MAX_FAILS = 10; // intentos fallidos permitidos por IP…
+const WINDOW_MIN = 15; // …en esta ventana de minutos
 
-/**
- * Login solo con contraseña: hay dos cuentas fijas en Supabase Auth (administrador y lector),
- * cuyos correos viven únicamente en variables de entorno del servidor. La contraseña escrita
- * determina con cuál cuenta se inicia sesión y, por tanto, el rol.
- */
-function cuentas() {
-  const admin = process.env.AUTH_ADMIN_EMAIL;
-  const lector = process.env.AUTH_LECTOR_EMAIL;
-  if (!admin || !lector) throw new Error("Faltan las variables de entorno AUTH_ADMIN_EMAIL y AUTH_LECTOR_EMAIL.");
-  return [admin, lector];
+async function clientIp() {
+  const h = await headers();
+  return (h.get("x-real-ip") || h.get("x-forwarded-for")?.split(",")[0] || "desconocida").trim().slice(0, 64);
 }
 
-export async function login(_prev: LoginState, form: FormData): Promise<LoginState> {
-  const password = String(form.get("password") ?? "");
-  if (!password || password.length > 128) return { error: GENERIC };
+const pause = () => new Promise((r) => setTimeout(r, 400 + Math.random() * 400));
 
-  const supabase = await createClient();
-  for (const email of cuentas()) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error) redirect("/");
-    if (error.status === 429) return { error: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." };
+export async function login(_prev: LoginState, form: FormData): Promise<LoginState> {
+  const user = String(form.get("username") ?? "");
+  const pass = String(form.get("password") ?? "");
+  if (!user || !pass || user.length > 100 || pass.length > 200) return { error: GENERIC };
+
+  const ip = await clientIp();
+  const since = new Date(Date.now() - WINDOW_MIN * 60_000).toISOString();
+  const { count, error: countError } = await db()
+    .from("login_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("ip", ip)
+    .gte("created_at", since);
+  if (countError) return { error: "No se pudo verificar el ingreso. Intenta de nuevo." };
+  if ((count ?? 0) >= MAX_FAILS) return { error: `Demasiados intentos. Espera ${WINDOW_MIN} minutos e inténtalo de nuevo.` };
+
+  const cuenta = await checkCredentials(user, pass);
+  if (!cuenta) {
+    await db().from("login_attempts").insert({ ip });
+    await db().from("login_attempts").delete().lt("created_at", new Date(Date.now() - 86_400_000).toISOString());
+    await pause();
+    return { error: GENERIC };
   }
-  return { error: GENERIC };
+
+  await db().from("login_attempts").delete().eq("ip", ip);
+  (await cookies()).set(SESSION_COOKIE, await createSessionToken(cuenta), sessionCookieOptions);
+  redirect("/");
 }
 
 export async function logout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  (await cookies()).delete(SESSION_COOKIE);
   redirect("/login");
 }

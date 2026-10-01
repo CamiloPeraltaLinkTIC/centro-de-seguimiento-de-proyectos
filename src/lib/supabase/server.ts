@@ -1,24 +1,18 @@
 import "server-only";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { cookieOptions, supabaseEnv } from "./config";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
 
-export async function createClient() {
-  const cookieStore = await cookies();
-  const { url, key } = supabaseEnv();
-  return createServerClient(url, key, {
-    cookieOptions,
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          for (const { name, value, options } of cookiesToSet) cookieStore.set(name, value, { ...options, ...cookieOptions });
-        } catch {
-          // Llamado desde un Server Component: el proxy se encarga de refrescar la sesión.
-        }
-      },
-    },
-  });
+/**
+ * Cliente de Supabase SOLO para el servidor, con la secret key.
+ * La autorización (sesión y rol) la hacen las server actions antes de usarlo.
+ */
+let client: SupabaseClient<Database> | null = null;
+
+export function db() {
+  if (client) return client;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) throw new Error("Faltan las variables de entorno SUPABASE_URL y SUPABASE_SECRET_KEY.");
+  client = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+  return client;
 }
