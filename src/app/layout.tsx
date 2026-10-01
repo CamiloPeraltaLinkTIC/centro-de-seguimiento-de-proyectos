@@ -7,7 +7,7 @@ const serif = Instrument_Serif({ variable: "--font-serif", subsets: ["latin"], w
 const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
-  title: "Gantt MATERAN",
+  title: "Centro de seguimiento de proyectos",
   description: "Plan de trabajo MATERAN · creación, expectativa y lanzamiento de marca",
 };
 

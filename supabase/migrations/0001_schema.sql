@@ -1,4 +1,4 @@
--- Gantt MATERAN · esquema, roles y políticas de acceso
+-- Centro de seguimiento de proyectos · esquema, roles y políticas de acceso
 -- Ejecutar en Supabase → SQL Editor (o `supabase db push`).
 
 -- ---------- Perfiles y roles ----------

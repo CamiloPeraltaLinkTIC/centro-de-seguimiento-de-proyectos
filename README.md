@@ -1,6 +1,6 @@
-# Gantt MATERAN
+# Centro de seguimiento de proyectos
 
-Tablero de seguimiento del plan de trabajo MATERAN (creación, expectativa y lanzamiento de marca).
+Tablero de seguimiento de proyectos de LinkTIC. Proyecto inicial: plan de trabajo MATERAN (creación, expectativa y lanzamiento de marca).
 Next.js 16 + Supabase (Postgres, Auth y Realtime), listo para desplegar en Vercel.
 
 ## Funcionalidades
