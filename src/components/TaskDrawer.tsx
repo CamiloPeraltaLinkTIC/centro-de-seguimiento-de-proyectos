@@ -28,7 +28,8 @@ export default function TaskDrawer(props: Props) {
   const [actividad, setActividad] = useState(task?.actividad ?? "");
   const [frente, setFrente] = useState(task?.frente_id ?? (presetFrente || (frentes.length ? "" : NUEVO)));
   const [nuevoFrente, setNuevoFrente] = useState("");
-  const [resp, setResp] = useState(() => responsables.find((r) => r.id === task?.responsable_id)?.nombre ?? "");
+  const [resp, setResp] = useState(task?.responsable_id ?? "");
+  const [nuevoResp, setNuevoResp] = useState("");
   const [estado, setEstado] = useState<Estado>(task?.estado ?? "Pendiente");
   const [avance, setAvance] = useState(+(task?.avance ?? 0) || 0);
   const [inicio, setInicio] = useState(task?.inicio ?? fmt(today));
@@ -39,6 +40,7 @@ export default function TaskDrawer(props: Props) {
   const [busy, setBusy] = useState(false);
   const first = useRef<HTMLInputElement>(null);
   const frRef = useRef<HTMLInputElement>(null);
+  const rsRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => first.current?.focus(), 30);
@@ -87,10 +89,14 @@ export default function TaskDrawer(props: Props) {
       frenteId = f.id;
     }
 
-    // El responsable se escribe libremente: si no existe en el catálogo, se crea.
-    let respId: string | null = null;
-    const n = resp.trim();
-    if (n) {
+    let respId: string | null = resp || null;
+    if (resp === NUEVO) {
+      const n = nuevoResp.trim();
+      if (!n) {
+        setBusy(false);
+        setMsg("Escribe el nombre del nuevo responsable.");
+        return;
+      }
       const existing = responsables.find((r) => r.nombre.toLowerCase() === n.toLowerCase());
       const r = existing ?? (await onCreateResponsable(n));
       if (!r) {
@@ -176,7 +182,23 @@ export default function TaskDrawer(props: Props) {
           </label>
           <label>
             Responsable
-            <input className="field" list="respList" disabled={ro} value={resp} onChange={(e) => setResp(e.target.value)} />
+            <select
+              className="field"
+              disabled={ro}
+              value={resp}
+              onChange={(e) => {
+                setResp(e.target.value);
+                if (e.target.value === NUEVO) setTimeout(() => rsRef.current?.focus(), 0);
+              }}
+            >
+              <option value="">Sin responsable</option>
+              {responsables.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+              {canWrite && <option value={NUEVO}>+ Nuevo responsable…</option>}
+            </select>
           </label>
         </div>
         {frenteSel === NUEVO && (
@@ -185,11 +207,12 @@ export default function TaskDrawer(props: Props) {
             <input className="field" ref={frRef} placeholder="Ej. Logística, Pauta digital…" value={nuevoFrente} onChange={(e) => setNuevoFrente(e.target.value)} />
           </label>
         )}
-        <datalist id="respList">
-          {responsables.map((r) => (
-            <option key={r.id} value={r.nombre} />
-          ))}
-        </datalist>
+        {resp === NUEVO && (
+          <label>
+            Nombre del nuevo responsable
+            <input className="field" ref={rsRef} placeholder="Ej. Ana Gómez - Diseño" value={nuevoResp} onChange={(e) => setNuevoResp(e.target.value)} />
+          </label>
+        )}
         <div>
           <p className="lbl" style={{ marginBottom: 6 }}>
             Estado
