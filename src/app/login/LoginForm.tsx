@@ -1,32 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useActionState } from "react";
+import { login, type LoginState } from "./actions";
 
 export default function LoginForm() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    const { error } = await createClient().auth.signInWithPassword({ email: email.trim(), password });
-    if (error) {
-      setError(error.message === "Invalid login credentials" ? "Correo o contraseña incorrectos." : error.message);
-      setBusy(false);
-      return;
-    }
-    router.replace("/");
-    router.refresh();
-  }
+  const [state, action, pending] = useActionState<LoginState, FormData>(login, { error: "" });
 
   return (
-    <form className="login-card" onSubmit={onSubmit}>
+    <form className="login-card" action={action}>
       <div>
         <h1>
           Plan de trabajo <em>MATERAN</em>
@@ -36,15 +17,17 @@ export default function LoginForm() {
       </div>
       <label>
         Correo
-        <input className="field" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="field" name="email" type="email" autoComplete="email" required maxLength={254} />
       </label>
       <label>
         Contraseña
-        <input className="field" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input className="field" name="password" type="password" autoComplete="current-password" required maxLength={128} />
       </label>
-      <p className="err" role="alert">{error}</p>
-      <button className="btn primary" type="submit" disabled={busy}>
-        {busy ? "Ingresando…" : "Ingresar"}
+      <p className="err" role="alert">
+        {state.error}
+      </p>
+      <button className="btn primary" type="submit" disabled={pending}>
+        {pending ? "Ingresando…" : "Ingresar"}
       </button>
     </form>
   );
