@@ -9,11 +9,16 @@ export default async function Home() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [{ data: frentes }, { data: responsables }, { data: tasks }] = await Promise.all([
+  const [fr, rs, ts] = await Promise.all([
     db().from("frentes").select("id,nombre,color,orden"),
     db().from("responsables").select("id,nombre"),
     db().from("tasks").select(TASK_COLS),
   ]);
+  const error = fr.error ?? rs.error ?? ts.error;
+  if (error) throw new Error(`No se pudieron leer los datos de Supabase: ${error.message}`);
+  const frentes = fr.data;
+  const responsables = rs.data;
+  const tasks = ts.data;
 
   return (
     <DashboardLoader

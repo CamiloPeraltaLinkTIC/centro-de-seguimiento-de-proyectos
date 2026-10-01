@@ -19,8 +19,9 @@ Next.js 16 + Supabase (Postgres), listo para desplegar en Vercel.
 1. Crea un proyecto en [supabase.com](https://supabase.com).
 2. En **SQL Editor**, ejecuta en este orden:
    1. `supabase/migrations/0001_schema.sql`: tablas, restricciones y cierre de acceso.
-   2. `supabase/seed.sql`: datos iniciales (6 frentes, 17 responsables, 38 actividades).
-3. En **Project Settings → API**, copia la *Project URL* y la **Secret key** (`sb_secret_…`, o `service_role` en proyectos antiguos).
+   2. `supabase/migrations/0002_actualizar_version_anterior.sql`: actualiza bases creadas con scripts anteriores (en una base nueva no hace nada).
+   3. `supabase/seed.sql`: datos iniciales (6 frentes, 17 responsables, 38 actividades). Si ya hay actividades, no inserta nada.
+3. En **Project Settings → API Keys**, copia la *Project URL* y la **Secret key** (`sb_secret_…`, o `service_role` en proyectos antiguos). **No** la publishable: con ella la app no arranca.
 
 No hace falta crear usuarios en Supabase Auth: las credenciales están en variables de entorno.
 

@@ -13,7 +13,7 @@ const nombres = new Set(frentes.map((f) => f.nombre));
 for (const t of tasks) if (!nombres.has(t.frente)) throw new Error(`Frente inexistente: ${t.frente} (actividad ${t.num})`);
 
 let sql = `-- Datos iniciales del tablero Gantt MATERAN (exportado ${data.meta?.exportado ?? ""}).
--- Generado por scripts/generate-seed.mjs. Ejecutar una sola vez, después de 0001_schema.sql.
+-- Generado por scripts/generate-seed.mjs. Ejecutar después de las migraciones; si ya hay actividades, no inserta nada.
 
 insert into public.frentes (nombre, color, orden) values
 ${frentes.map((f) => `  (${q(f.nombre)}, ${q(f.color)}, ${f.orden})`).join(",\n")}

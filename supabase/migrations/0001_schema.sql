@@ -1,5 +1,5 @@
 -- Centro de seguimiento de proyectos · esquema y seguridad
--- Ejecutar en Supabase → SQL Editor (o `supabase db push`), y después supabase/seed.sql.
+-- Ejecutar en Supabase → SQL Editor, en orden: 0001_schema.sql, 0002_actualizar_version_anterior.sql y seed.sql.
 --
 -- Modelo de acceso: SOLO el servidor de la app (con la secret key) lee y escribe.
 -- RLS está activo sin políticas y los roles anon/authenticated no tienen privilegios:
@@ -37,6 +37,8 @@ create table if not exists public.tasks (
   updated_at timestamptz not null default now(),
   constraint tasks_fechas check (fin >= inicio)
 );
+-- Si la tabla venía de una versión anterior sin esta columna, se agrega (0002 migra los datos).
+alter table public.tasks add column if not exists responsable_id uuid references public.responsables (id) on delete restrict;
 create index if not exists tasks_frente_idx on public.tasks (frente_id);
 create index if not exists tasks_responsable_idx on public.tasks (responsable_id);
 
@@ -64,3 +66,8 @@ alter table public.login_attempts enable row level security;
 
 revoke all on public.frentes, public.responsables, public.tasks, public.login_attempts from anon, authenticated;
 revoke execute on function public.touch_updated_at() from anon, authenticated, public;
+
+-- El servidor (secret key = rol service_role) conserva acceso explícito.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on public.frentes, public.responsables, public.tasks, public.login_attempts to service_role;
+grant usage, select on all sequences in schema public to service_role;
