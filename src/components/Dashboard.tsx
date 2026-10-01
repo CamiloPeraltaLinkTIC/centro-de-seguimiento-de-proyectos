@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DAY, dur, fmt, human, isLate, pd, PAL, sortFrentes, sortResponsables, TASK_COLS, todayUTC, weighted } from "@/lib/gantt";
+import * as api from "@/app/board/actions";
+import { DAY, dur, fmt, human, isLate, pd, PAL, sortFrentes, sortResponsables, todayUTC, weighted } from "@/lib/gantt";
 import type { Frente, Responsable, Role, Task, TaskInput } from "@/lib/gantt";
-import { createClient } from "@/lib/supabase/client";
 import Band from "./Band";
 import FrentesDrawer, { type FrenteDraft } from "./FrentesDrawer";
 import Gantt, { type GanttHandle } from "./Gantt";
@@ -12,10 +12,10 @@ import TaskDrawer from "./TaskDrawer";
 
 type Props = { email: string; role: Role; initialFrentes: Frente[]; initialResponsables: Responsable[]; initialTasks: Task[] };
 type Sync = { s: "idle" | "live" | "saving" | "error"; txt: string };
+const POLL_MS = 15000;
 export type Filters = { estado: string; frente: string; resp: string; q: string };
 
 export default function Dashboard({ email, role, initialFrentes, initialResponsables, initialTasks }: Props) {
-  const supabase = useMemo(() => createClient(), []);
   const canWrite = role === "admin";
   const TODAY = useMemo(() => todayUTC(), []);
 
@@ -37,42 +37,38 @@ export default function Dashboard({ email, role, initialFrentes, initialResponsa
   const respById = useMemo(() => new Map(responsables.map((r) => [r.id, r.nombre])), [responsables]);
   const respName = useCallback((id: string | null) => (id ? (respById.get(id) ?? "") : ""), [respById]);
 
-  /* ---------- datos + tiempo real ---------- */
+  /* ---------- datos (vía servidor; el navegador no habla con Supabase) ---------- */
+  const busy = useRef(0);
   const reload = useCallback(async () => {
-    const [fr, rs, ts] = await Promise.all([
-      supabase.from("frentes").select("id,nombre,color,orden"),
-      supabase.from("responsables").select("id,nombre"),
-      supabase.from("tasks").select(TASK_COLS),
-    ]);
-    if (fr.error || rs.error || ts.error) {
+    const r = await api.getBoard().catch(() => null);
+    if (!r?.ok) {
       setSync({ s: "error", txt: "Conexión perdida" });
-      return;
+      return false;
     }
-    setFrentes(fr.data as Frente[]);
-    setResponsables(rs.data as Responsable[]);
-    setTasks(ts.data as Task[]);
-  }, [supabase]);
+    // No pisar los cambios optimistas mientras hay una escritura en curso.
+    if (busy.current) return true;
+    setFrentes(r.data.frentes);
+    setResponsables(r.data.responsables);
+    setTasks(r.data.tasks);
+    setSync({ s: "live", txt: "Sincronizado" });
+    return true;
+  }, []);
 
+  // Actualización periódica para ver los cambios de otros usuarios.
   useEffect(() => {
-    let t: ReturnType<typeof setTimeout> | undefined;
-    const schedule = () => {
-      clearTimeout(t);
-      t = setTimeout(reload, 150);
+    const tick = () => {
+      if (document.visibilityState === "visible") reload();
     };
-    const ch = supabase
-      .channel("gantt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, schedule)
-      .on("postgres_changes", { event: "*", schema: "public", table: "frentes" }, schedule)
-      .on("postgres_changes", { event: "*", schema: "public", table: "responsables" }, schedule)
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") setSync({ s: "live", txt: "Sincronizado" });
-        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setSync({ s: "error", txt: "Sin tiempo real" });
-      });
+    tick();
+    const iv = setInterval(tick, POLL_MS);
+    document.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
     return () => {
-      clearTimeout(t);
-      supabase.removeChannel(ch);
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
     };
-  }, [supabase, reload]);
+  }, [reload]);
 
   useEffect(() => {
     if (tasks.length) ganttRef.current?.scrollToday(false);
@@ -81,110 +77,57 @@ export default function Dashboard({ email, role, initialFrentes, initialResponsa
   }, []);
 
   /* ---------- escritura ---------- */
-  async function run(op: () => PromiseLike<{ error: unknown; data?: unknown }>): Promise<{ ok: boolean; data?: unknown }> {
+  async function run<T>(op: () => Promise<{ ok: true; data: T } | { ok: false; error: string }>) {
+    busy.current++;
     setSync({ s: "saving", txt: "Guardando…" });
-    const { error, data } = await op();
-    if (error) {
-      setSync({ s: "error", txt: "No se guardó" });
-      return { ok: false };
-    }
-    setSync({ s: "live", txt: "Sincronizado" });
-    return { ok: true, data };
+    const r = await op().catch(() => ({ ok: false as const, error: "" }));
+    busy.current--;
+    setSync(r.ok ? { s: "live", txt: "Sincronizado" } : { s: "error", txt: "No se guardó" });
+    return r;
   }
 
   async function saveTask(id: string | null, body: TaskInput) {
-    if (id) {
-      const prev = tasks;
-      setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...body } : t)));
-      const r = await run(() => supabase.from("tasks").update(body).eq("id", id));
-      if (!r.ok) setTasks(prev);
-      return r.ok;
+    const prev = tasks;
+    if (id) setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...body } : t)));
+    const r = await run(() => api.saveTask(id, body));
+    if (!r.ok) {
+      setTasks(prev);
+      return false;
     }
-    const r = await run(() => supabase.from("tasks").insert(body).select(TASK_COLS).single());
-    if (r.ok && r.data) setTasks((ts) => [...ts, r.data as Task]);
-    return r.ok;
+    setTasks((ts) => (id ? ts.map((t) => (t.id === id ? r.data : t)) : [...ts, r.data]));
+    return true;
   }
 
   async function deleteTask(id: string) {
-    const r = await run(() => supabase.from("tasks").delete().eq("id", id));
+    const r = await run(() => api.deleteTask(id));
     if (r.ok) setTasks((ts) => ts.filter((t) => t.id !== id));
     return r.ok;
   }
 
   async function createFrente(nombre: string) {
-    const orden = Math.max(0, ...frentes.map((f) => +f.orden || 0)) + 1;
-    const color = PAL[frentes.length % PAL.length][0];
-    const r = await run(() => supabase.from("frentes").insert({ nombre, color, orden }).select("id,nombre,color,orden").single());
-    if (!r.ok || !r.data) return null;
-    const f = r.data as Frente;
-    setFrentes((fs) => [...fs, f]);
-    return f;
+    const r = await run(() => api.createFrente(nombre, PAL[frentes.length % PAL.length][0]));
+    if (!r.ok) return null;
+    setFrentes((fs) => [...fs, r.data]);
+    return r.data;
   }
 
   async function saveFrentes(draft: FrenteDraft[]) {
-    setSync({ s: "saving", txt: "Guardando…" });
-    try {
-      for (const d of draft) {
-        if (d.del && d.id) {
-          const { error } = await supabase.from("frentes").delete().eq("id", d.id);
-          if (error) throw error;
-        }
-      }
-      let orden = 1;
-      for (const d of draft) {
-        if (d.del) continue;
-        const body = { nombre: d.nombre.trim(), color: d.color, orden: orden++ };
-        const prev = d.id ? frenteById.get(d.id) : null;
-        if (prev && prev.nombre === body.nombre && prev.color === body.color && prev.orden === body.orden) continue;
-        const { error } = d.id
-          ? await supabase.from("frentes").update(body).eq("id", d.id)
-          : await supabase.from("frentes").insert(body);
-        if (error) throw error;
-      }
-      await reload();
-      setSync({ s: "live", txt: "Sincronizado" });
-      return true;
-    } catch {
-      await reload();
-      setSync({ s: "error", txt: "No se guardó" });
-      return false;
-    }
+    const r = await run(() => api.saveFrentes(draft.map(({ id, nombre, color, del }) => ({ id, nombre, color, del }))));
+    await reload();
+    return r.ok;
   }
 
   async function createResponsable(nombre: string) {
-    const r = await run(() => supabase.from("responsables").insert({ nombre }).select("id,nombre").single());
-    if (!r.ok || !r.data) return null;
-    const nr = r.data as Responsable;
-    setResponsables((rs) => [...rs, nr]);
-    return nr;
+    const r = await run(() => api.createResponsable(nombre));
+    if (!r.ok) return null;
+    setResponsables((rs) => [...rs, r.data]);
+    return r.data;
   }
 
   async function saveResponsables(draft: ResponsableDraft[]) {
-    setSync({ s: "saving", txt: "Guardando…" });
-    try {
-      for (const d of draft) {
-        if (d.del && d.id) {
-          const { error } = await supabase.from("responsables").delete().eq("id", d.id);
-          if (error) throw error;
-        }
-      }
-      for (const d of draft) {
-        if (d.del) continue;
-        const nombre = d.nombre.trim();
-        if (d.id && respById.get(d.id) === nombre) continue;
-        const { error } = d.id
-          ? await supabase.from("responsables").update({ nombre }).eq("id", d.id)
-          : await supabase.from("responsables").insert({ nombre });
-        if (error) throw error;
-      }
-      await reload();
-      setSync({ s: "live", txt: "Sincronizado" });
-      return true;
-    } catch {
-      await reload();
-      setSync({ s: "error", txt: "No se guardó" });
-      return false;
-    }
+    const r = await run(() => api.saveResponsables(draft.map(({ id, nombre, del }) => ({ id, nombre, del }))));
+    await reload();
+    return r.ok;
   }
 
   /* ---------- derivados ---------- */
