@@ -12,6 +12,7 @@ Next.js 16 + Supabase (Postgres, Auth y Realtime), listo para desplegar en Verce
   - `admin`: crea, edita, elimina y arrastra actividades; gestiona frentes y responsables.
   - `lector`: ve todo en modo solo lectura.
 - Cambios en tiempo real entre todos los usuarios conectados.
+- Para cerrar sesión, visita `/salir`. Al pasar el cursor sobre el indicador de sincronización se ve el usuario y su rol.
 
 ## 1. Configurar Supabase
 
@@ -65,7 +66,7 @@ src/
   app/
     page.tsx            # carga datos y rol del usuario (server)
     login/              # pantalla de ingreso
-    actions.ts          # cerrar sesión
+    salir/route.ts      # cerrar sesión (/salir)
   components/
     Dashboard.tsx       # estado, tiempo real y escritura en Supabase
     Gantt.tsx           # diagrama y arrastre para reprogramar
