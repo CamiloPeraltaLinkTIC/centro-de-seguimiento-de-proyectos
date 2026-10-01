@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gantt MATERAN
 
-## Getting Started
+Tablero de seguimiento del plan de trabajo MATERAN (creación, expectativa y lanzamiento de marca).
+Next.js 16 + Supabase (Postgres, Auth y Realtime), listo para desplegar en Vercel.
 
-First, run the development server:
+## Funcionalidades
+
+- Gantt por frente con escalas Mes / Semana / Día, línea de "hoy", hitos y actividades atrasadas.
+- Resumen de avance ponderado por duración, avance por frente, atrasadas y próximas a vencer.
+- Filtros por estado, frente, responsable y búsqueda. Exportación a CSV.
+- **Roles**
+  - `admin`: crea, edita, elimina y arrastra actividades; gestiona frentes y responsables.
+  - `lector`: ve todo en modo solo lectura.
+- Cambios en tiempo real entre todos los usuarios conectados.
+
+## 1. Configurar Supabase
+
+1. Crea un proyecto en [supabase.com](https://supabase.com).
+2. En **SQL Editor**, ejecuta en este orden:
+   1. `supabase/migrations/0001_schema.sql`: tablas, roles y políticas RLS.
+   2. `supabase/migrations/0002_responsables.sql`: catálogo de responsables.
+   3. `supabase/seed.sql`: datos iniciales (6 frentes, 17 responsables, 38 actividades).
+3. En **Authentication → Sign In / Providers**, desactiva *Allow new users to sign up* para que solo entren los usuarios que crees.
+4. Crea los usuarios en **Authentication → Users → Add user → Create new user** (marca *Auto Confirm User*). Todos nacen como `lector`.
+5. Promueve a los administradores en el SQL Editor (ver `supabase/roles.sql`):
+
+   ```sql
+   update public.profiles set role = 'admin' where email = 'tu-correo@linktic.com';
+   ```
+
+Con la [CLI de Supabase](https://supabase.com/docs/guides/cli) también puedes usar `supabase link` y `supabase db push`.
+
+### Regenerar la semilla
+
+Los datos fuente están en `supabase/data/materan-data.json`. Si los cambias:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+node scripts/generate-seed.mjs
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 2. Desarrollo local
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env.local   # completa con los datos de Project Settings → API
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Dónde se encuentra |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Project Settings → API → Project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Project Settings → API Keys → Publishable key (o la `anon` key en proyectos antiguos) |
 
-## Learn More
+## 3. Desplegar en Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. En [vercel.com/new](https://vercel.com/new), importa este repositorio de GitHub.
+2. Agrega las dos variables de entorno anteriores (Production, Preview y Development).
+3. Despliega. Vercel detecta Next.js automáticamente.
+4. En Supabase → **Authentication → URL Configuration**, pon la URL de Vercel como *Site URL*.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estructura
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+  app/
+    page.tsx            # carga datos y rol del usuario (server)
+    login/              # pantalla de ingreso
+    actions.ts          # cerrar sesión
+  components/
+    Dashboard.tsx       # estado, tiempo real y escritura en Supabase
+    Gantt.tsx           # diagrama y arrastre para reprogramar
+    TaskDrawer.tsx      # crear / editar actividad
+    FrentesDrawer.tsx   # gestionar frentes
+    ResponsablesDrawer.tsx
+  lib/
+    gantt.ts            # tipos y utilidades de fechas
+    supabase/           # clientes browser / server / proxy
+  proxy.ts              # refresca la sesión y protege las rutas
+supabase/
+  migrations/           # esquema, RLS y realtime
+  seed.sql              # datos iniciales
+  data/                 # export original del tablero
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+La seguridad se aplica en la base de datos con Row Level Security: aunque alguien manipule el cliente, solo los perfiles `admin` pueden escribir.
