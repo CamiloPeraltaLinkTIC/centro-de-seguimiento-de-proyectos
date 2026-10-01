@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { signOut } from "@/app/actions";
 import { DAY, dur, fmt, human, isLate, pd, PAL, sortFrentes, sortResponsables, TASK_COLS, todayUTC, weighted } from "@/lib/gantt";
 import type { Frente, Responsable, Role, Task, TaskInput } from "@/lib/gantt";
 import { createClient } from "@/lib/supabase/client";
@@ -23,7 +22,7 @@ export default function Dashboard({ email, role, initialFrentes, initialResponsa
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [frentesRaw, setFrentes] = useState<Frente[]>(initialFrentes);
   const [respRaw, setResponsables] = useState<Responsable[]>(initialResponsables);
-  const [sync, setSync] = useState<Sync>({ s: "live", txt: "Sincronizado" });
+  const [sync, setSync] = useState<Sync>({ s: "idle", txt: "Conectando…" });
   const [F, setF] = useState<Filters>({ estado: "", frente: "", resp: "", q: "" });
   const [ppd, setPpd] = useState(12);
   const [taskDrawer, setTaskDrawer] = useState<{ id: string | null; presetFrente?: string } | null>(null);
@@ -253,21 +252,8 @@ export default function Dashboard({ email, role, initialFrentes, initialResponsa
   return (
     <>
       <Band>
-        <span className="sync" data-s={sync.s}>
+        <span className="sync" data-s={sync.s} title={`${email} · ${role === "admin" ? "Administrador" : "Lector"}`}>
           {sync.txt}
-        </span>
-        <span className="who">
-          <span className="em" title={email}>
-            {email}
-          </span>
-          <span className="role" data-r={role}>
-            {role === "admin" ? "Admin" : "Lector"}
-          </span>
-          <form action={signOut}>
-            <button className="out" type="submit">
-              Salir
-            </button>
-          </form>
         </span>
       </Band>
 

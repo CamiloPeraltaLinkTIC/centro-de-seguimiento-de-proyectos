@@ -28,8 +28,7 @@ export default function TaskDrawer(props: Props) {
   const [actividad, setActividad] = useState(task?.actividad ?? "");
   const [frente, setFrente] = useState(task?.frente_id ?? (presetFrente || (frentes.length ? "" : NUEVO)));
   const [nuevoFrente, setNuevoFrente] = useState("");
-  const [resp, setResp] = useState(task?.responsable_id ?? "");
-  const [nuevoResp, setNuevoResp] = useState("");
+  const [resp, setResp] = useState(() => responsables.find((r) => r.id === task?.responsable_id)?.nombre ?? "");
   const [estado, setEstado] = useState<Estado>(task?.estado ?? "Pendiente");
   const [avance, setAvance] = useState(+(task?.avance ?? 0) || 0);
   const [inicio, setInicio] = useState(task?.inicio ?? fmt(today));
@@ -40,7 +39,6 @@ export default function TaskDrawer(props: Props) {
   const [busy, setBusy] = useState(false);
   const first = useRef<HTMLInputElement>(null);
   const frRef = useRef<HTMLInputElement>(null);
-  const rsRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => first.current?.focus(), 30);
@@ -73,10 +71,7 @@ export default function TaskDrawer(props: Props) {
       setMsg("La fecha de fin no puede ser anterior al inicio.");
       return;
     }
-    if (resp === NUEVO && !nuevoResp.trim()) {
-      setMsg("Escribe el nombre del nuevo responsable.");
-      return;
-    }
+    if (busy) return;
     setBusy(true);
     setMsg("");
 
@@ -92,9 +87,10 @@ export default function TaskDrawer(props: Props) {
       frenteId = f.id;
     }
 
-    let respId: string | null = resp || null;
-    if (resp === NUEVO) {
-      const n = nuevoResp.trim();
+    // El responsable se escribe libremente: si no existe en el catálogo, se crea.
+    let respId: string | null = null;
+    const n = resp.trim();
+    if (n) {
       const existing = responsables.find((r) => r.nombre.toLowerCase() === n.toLowerCase());
       const r = existing ?? (await onCreateResponsable(n));
       if (!r) {
@@ -127,6 +123,7 @@ export default function TaskDrawer(props: Props) {
       setDelArmed(true);
       return;
     }
+    if (busy) return;
     setBusy(true);
     const ok = await onDelete(task.id);
     setBusy(false);
@@ -179,23 +176,7 @@ export default function TaskDrawer(props: Props) {
           </label>
           <label>
             Responsable
-            <select
-              className="field"
-              disabled={ro}
-              value={resp}
-              onChange={(e) => {
-                setResp(e.target.value);
-                if (e.target.value === NUEVO) setTimeout(() => rsRef.current?.focus(), 0);
-              }}
-            >
-              <option value="">Sin responsable</option>
-              {responsables.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.nombre}
-                </option>
-              ))}
-              {canWrite && <option value={NUEVO}>+ Nuevo responsable…</option>}
-            </select>
+            <input className="field" list="respList" disabled={ro} value={resp} onChange={(e) => setResp(e.target.value)} />
           </label>
         </div>
         {frenteSel === NUEVO && (
@@ -204,12 +185,11 @@ export default function TaskDrawer(props: Props) {
             <input className="field" ref={frRef} placeholder="Ej. Logística, Pauta digital…" value={nuevoFrente} onChange={(e) => setNuevoFrente(e.target.value)} />
           </label>
         )}
-        {resp === NUEVO && (
-          <label>
-            Nombre del nuevo responsable
-            <input className="field" ref={rsRef} placeholder="Ej. Ana Gómez - Diseño" value={nuevoResp} onChange={(e) => setNuevoResp(e.target.value)} />
-          </label>
-        )}
+        <datalist id="respList">
+          {responsables.map((r) => (
+            <option key={r.id} value={r.nombre} />
+          ))}
+        </datalist>
         <div>
           <p className="lbl" style={{ marginBottom: 6 }}>
             Estado
@@ -259,17 +239,17 @@ export default function TaskDrawer(props: Props) {
       </form>
       <div className="d-foot">
         {canWrite && task && (
-          <button className={`btn danger ${delArmed ? "armed" : ""}`} type="button" disabled={busy} onClick={del}>
+          <button className={`btn danger ${delArmed ? "armed" : ""}`} type="button" onClick={del}>
             {delArmed ? "Confirmar eliminación" : "Eliminar"}
           </button>
         )}
         <span className="msg">{msg}</span>
         <button className="btn" type="button" onClick={onClose}>
-          {canWrite ? "Cancelar" : "Cerrar"}
+          Cancelar
         </button>
         {canWrite && (
-          <button className="btn primary" type="button" disabled={busy} onClick={save}>
-            {busy ? "Guardando…" : "Guardar"}
+          <button className="btn primary" type="button" onClick={save}>
+            Guardar
           </button>
         )}
       </div>

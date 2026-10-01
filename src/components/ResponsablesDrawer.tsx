@@ -99,7 +99,7 @@ export default function ResponsablesDrawer({ responsables, tasks, onClose, onSav
           Cancelar
         </button>
         <button className="btn primary" type="button" disabled={busy} onClick={save}>
-          {busy ? "Guardando…" : "Guardar cambios"}
+          Guardar cambios
         </button>
       </div>
     </aside>

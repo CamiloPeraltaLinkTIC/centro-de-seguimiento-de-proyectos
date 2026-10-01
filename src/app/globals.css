@@ -1,3 +1,4 @@
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* Layout: Azul Premium brand band with the K-line motif, title with serif-italic keyword (manual style), summary strip, toolbar, full-width Gantt with sticky activity column; drawers for task and frente editing. Palette from the LinkTIC Manual de Marca v3. */
 :root{
   --premium:#2709CD; --azul:#0094FF; --cian:#00D9FF; --grafito:#1E232F; --gris-azul:#516276; --gris-tech:#E1E1E1;
@@ -27,7 +28,7 @@
   --band:#2709CD; --band-fg:#FFFFFF; --band-muted:#C9C1FF; --shadow:0 12px 40px rgba(0,0,0,.5); color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--azul);outline-offset:2px}
 
@@ -229,17 +230,6 @@ h1 em{font-family:var(--f-serif);font-style:italic;font-weight:400;color:var(--l
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
-img{max-width:100%}
-.band .logo-link{display:block;line-height:0}
-
-/* Usuario */
-.who{display:inline-flex;align-items:center;gap:10px}
-.who .em{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.role{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.18)}
-.role[data-r="admin"]{background:#00D9FF;color:#0B0F18}
-.out{border:1px solid rgba(255,255,255,.4);background:none;color:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:600;font-size:12.5px}
-.out:hover{background:rgba(255,255,255,.12)}
-@media (max-width:720px){.who .em{display:none}}
 
 /* Login */
 .login{min-height:calc(100vh - 92px);display:grid;place-items:center;padding:32px 16px}

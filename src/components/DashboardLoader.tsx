@@ -10,14 +10,19 @@ const Dashboard = dynamic(() => import("./Dashboard"), {
   ssr: false,
   loading: () => (
     <>
-      <Band />
-      <div className="wrap">
+      <Band>
+        <span className="sync" data-s="idle">
+          Conectando…
+        </span>
+      </Band>
+      <main className="wrap">
         <div className="gantt">
           <div className="empty">
             <b>Cargando el plan…</b>
+            <span>Las actividades aparecen aquí en cuanto se conecta la base del proyecto.</span>
           </div>
         </div>
-      </div>
+      </main>
     </>
   ),
 });
