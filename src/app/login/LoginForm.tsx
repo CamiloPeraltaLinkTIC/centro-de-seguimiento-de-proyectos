@@ -13,15 +13,11 @@ export default function LoginForm() {
           Plan de trabajo <em>MATERAN</em>
         </h1>
         <span className="rule" aria-hidden="true" />
-        <p className="sub">Ingresa con tu cuenta para ver el plan.</p>
+        <p className="sub">Ingresa la contraseña para ver el plan.</p>
       </div>
       <label>
-        Correo
-        <input className="field" name="email" type="email" autoComplete="email" required maxLength={254} />
-      </label>
-      <label>
         Contraseña
-        <input className="field" name="password" type="password" autoComplete="current-password" required maxLength={128} />
+        <input className="field" name="password" type="password" autoComplete="current-password" required maxLength={128} autoFocus />
       </label>
       <p className="err" role="alert">
         {state.error}

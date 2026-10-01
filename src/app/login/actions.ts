@@ -5,21 +5,31 @@ import { createClient } from "@/lib/supabase/server";
 
 export type LoginState = { error: string };
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const GENERIC = "Correo o contraseña incorrectos.";
+const GENERIC = "Contraseña incorrecta.";
+
+/**
+ * Login solo con contraseña: hay dos cuentas fijas en Supabase Auth (administrador y lector),
+ * cuyos correos viven únicamente en variables de entorno del servidor. La contraseña escrita
+ * determina con cuál cuenta se inicia sesión y, por tanto, el rol.
+ */
+function cuentas() {
+  const admin = process.env.AUTH_ADMIN_EMAIL;
+  const lector = process.env.AUTH_LECTOR_EMAIL;
+  if (!admin || !lector) throw new Error("Faltan las variables de entorno AUTH_ADMIN_EMAIL y AUTH_LECTOR_EMAIL.");
+  return [admin, lector];
+}
 
 export async function login(_prev: LoginState, form: FormData): Promise<LoginState> {
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
-  if (!EMAIL.test(email) || email.length > 254 || !password || password.length > 128) return { error: GENERIC };
+  if (!password || password.length > 128) return { error: GENERIC };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    // Mensaje genérico: no revela si el correo existe.
-    return { error: error.status === 429 ? "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." : GENERIC };
+  for (const email of cuentas()) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error) redirect("/");
+    if (error.status === 429) return { error: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." };
   }
-  redirect("/");
+  return { error: GENERIC };
 }
 
 export async function logout() {
