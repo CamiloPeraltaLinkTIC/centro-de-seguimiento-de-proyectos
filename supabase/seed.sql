@@ -1,7 +1,7 @@
 -- Datos iniciales del tablero Gantt MATERAN (exportado 2026-10-01).
--- Generado por scripts/generate-seed.mjs. Ejecutar después de las migraciones; si ya hay actividades, no inserta nada.
+-- Generado por scripts/generate-seed.mjs. Ejecutar después de 0001_seguimiento.sql; si ya hay actividades, no inserta nada.
 
-insert into public.frentes (nombre, color, orden) values
+insert into seguimiento.frentes (nombre, color, orden) values
   ('Estrategia', '#2709CD', 1),
   ('Digital / RRSS', '#0094FF', 2),
   ('E-commerce', '#00D9FF', 3),
@@ -10,7 +10,7 @@ insert into public.frentes (nombre, color, orden) values
   ('Legal', '#86858A', 6)
 on conflict (nombre) do nothing;
 
-insert into public.responsables (nombre) values
+insert into seguimiento.responsables (nombre) values
   ('Luis Cuellar'),
   ('Alejandro Marín - Analista MKT'),
   ('Natalia Ochoa - CM'),
@@ -30,7 +30,7 @@ insert into public.responsables (nombre) values
   ('Legal')
 on conflict (nombre) do nothing;
 
-insert into public.tasks (num, frente_id, responsable_id, actividad, estado, avance, inicio, fin, notas)
+insert into seguimiento.actividades (num, frente_id, responsable_id, actividad, estado, avance, inicio, fin, notas)
 select v.num, f.id, r.id, v.actividad, v.estado, v.avance, v.inicio::date, v.fin::date, v.notas
 from (values
   (1, 'Estrategia', 'Luis Cuellar', 'Benchmark de competencia', 'Cerrada', 100, '2026-07-27', '2026-07-30', ''),
@@ -72,6 +72,6 @@ from (values
   (37, 'Packaging', 'Luis Cuellar', 'Cotizaciones', 'Cerrada', 100, '2026-07-20', '2026-08-07', ''),
   (38, 'Legal', 'Legal', 'T&C de cambios, garantías y devoluciones', 'Pendiente', 0, '2026-08-13', '2026-08-19', '')
 ) as v(num, frente, responsable, actividad, estado, avance, inicio, fin, notas)
-join public.frentes f on f.nombre = v.frente
-left join public.responsables r on r.nombre = v.responsable
-where not exists (select 1 from public.tasks);
+join seguimiento.frentes f on f.nombre = v.frente
+left join seguimiento.responsables r on r.nombre = v.responsable
+where not exists (select 1 from seguimiento.actividades);
