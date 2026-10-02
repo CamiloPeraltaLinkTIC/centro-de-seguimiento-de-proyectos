@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import type { ComponentProps } from "react";
-import { ui } from "@/lib/ui";
 import Band from "./Band";
+import { DashboardSkeleton } from "./Loader";
 import SyncBadge from "./SyncBadge";
 import type DashboardType from "./Dashboard";
 
@@ -15,14 +15,7 @@ const Dashboard = dynamic(() => import("./Dashboard"), {
       <Band>
         <SyncBadge s="idle" txt="Conectando…" />
       </Band>
-      <main className={ui.page}>
-        <div className="edge-gradient grid h-[420px] place-items-center rounded-[22px] bg-surface" aria-busy="true">
-          <div className={ui.emptyState}>
-            <b className={ui.emptyTitle}>Cargando el plan…</b>
-            <span>Las actividades aparecen aquí en cuanto se conecta la base del proyecto.</span>
-          </div>
-        </div>
-      </main>
+      <DashboardSkeleton label="Preparando el tablero" />
     </>
   ),
 });

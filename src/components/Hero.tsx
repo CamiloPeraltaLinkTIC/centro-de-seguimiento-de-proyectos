@@ -136,14 +136,14 @@ export default function Hero({ tasks, frentes, today, F, setF, onOpenTask, respN
                 dd: (
                   <>
                     {hasTasks ? human(end) : "—"}
-                    {hasTasks && <small className="font-sans text-[11.5px] font-normal text-muted">{diasCierre >= 0 ? ` · faltan ${diasCierre} d` : ` · hace ${-diasCierre} d`}</small>}
+                    {hasTasks && <small className="block font-sans text-[11.5px] font-normal text-muted">{diasCierre >= 0 ? `faltan ${diasCierre} días` : `hace ${-diasCierre} días`}</small>}
                   </>
                 ),
               },
             ].map((x) => (
               <div key={x.dt} className="min-w-0 border-line px-3 py-2.5 max-sm:border-t max-sm:first:border-t-0 sm:border-l sm:first:border-l-0">
                 <dt className="text-[10px] leading-tight font-bold uppercase tracking-[.1em] text-dim">{x.dt}</dt>
-                <dd className="m-0 mt-1 font-display text-[17px] font-semibold tracking-tight whitespace-nowrap">{x.dd}</dd>
+                <dd className="m-0 mt-1 font-display text-[15px] leading-snug font-semibold tracking-tight 2xl:text-[17px]">{x.dd}</dd>
               </div>
             ))}
           </dl>
@@ -152,17 +152,18 @@ export default function Hero({ tasks, frentes, today, F, setF, onOpenTask, respN
         {/* Barra de estados: un segmento por actividad */}
         <div className="grid gap-2.5" role="group" aria-label="Actividades por estado">
           <div className="flex h-4 gap-0.5">
-            {groups.flatMap((g) =>
-              g.items.map((t) => (
+            {groups
+              .flatMap((g) => g.items.map((t) => ({ g, t })))
+              .map(({ g, t }, i) => (
                 <button
                   key={t.id}
-                  className={cn("min-w-[3px] flex-1 rounded-[3px] transition hover:scale-y-[1.45] hover:brightness-125", g.seg, F.estado && F.estado !== g.key && "opacity-20")}
+                  style={{ animationDelay: `${0.35 + i * 0.018}s` }}
+                  className={cn("min-w-[3px] flex-1 origin-bottom animate-grow-y rounded-[3px] transition hover:scale-y-[1.45] hover:brightness-125", g.seg, F.estado && F.estado !== g.key && "opacity-20")}
                   title={`#${t.num} ${t.actividad} · ${g.label.toLowerCase()}`}
                   aria-label={`#${t.num} ${t.actividad}, ${g.label}`}
                   onClick={() => onOpenTask(t.id)}
                 />
-              )),
-            )}
+              ))}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {groups.map((g) => (
@@ -196,9 +197,10 @@ export default function Hero({ tasks, frentes, today, F, setF, onOpenTask, respN
             ))}
           </div>
 
-          {frentes.map((f) => {
+          {frentes.map((f, laneIdx) => {
             const ts = tasks.filter((t) => t.frente_id === f.id);
             const on = F.frente === f.id;
+            const laneDelay = 0.45 + laneIdx * 0.09;
             return (
               <div
                 key={f.id}
@@ -232,8 +234,8 @@ export default function Hero({ tasks, frentes, today, F, setF, onOpenTask, respN
                       return (
                         <button
                           key={t.id}
-                          className={cn("absolute top-1/2 -mt-[6.5px] -ml-[6.5px] size-[13px] rotate-45 rounded-[3px] transition hover:scale-125 hover:brightness-125", MILE[b === "late" ? "late" : b === "Cerrada" ? "ok" : "mile"])}
-                          style={{ left: `${left + width / 2}%` }}
+                          className={cn("absolute top-1/2 -mt-[6.5px] -ml-[6.5px] size-[13px] rotate-45 animate-fade-in rounded-[3px] transition hover:scale-125 hover:brightness-125", MILE[b === "late" ? "late" : b === "Cerrada" ? "ok" : "mile"])}
+                          style={{ left: `${left + width / 2}%`, animationDelay: `${laneDelay + 0.5}s` }}
                           title={title}
                           aria-label={title}
                           onClick={() => onOpenTask(t.id)}
@@ -243,8 +245,8 @@ export default function Hero({ tasks, frentes, today, F, setF, onOpenTask, respN
                     return (
                       <button
                         key={t.id}
-                        className={cn("absolute top-1/2 -mt-1.5 h-3 min-w-[5px] overflow-hidden rounded-full transition hover:z-10 hover:scale-y-[1.35] hover:brightness-125", CAP[k])}
-                        style={{ left: `${left}%`, width: `${width}%` }}
+                        className={cn("absolute top-1/2 -mt-1.5 h-3 min-w-[5px] origin-left animate-grow-x overflow-hidden rounded-full transition hover:z-10 hover:scale-y-[1.35] hover:brightness-125", CAP[k])}
+                        style={{ left: `${left}%`, width: `${width}%`, animationDelay: `${laneDelay + left / 400}s` }}
                         title={title}
                         aria-label={title}
                         onClick={() => onOpenTask(t.id)}

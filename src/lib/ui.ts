@@ -21,7 +21,7 @@ export const ui = {
     "w-full min-w-0 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-sm text-fg outline-none transition placeholder:text-dim focus:border-brand/70 focus:ring-3 focus:ring-brand/20 disabled:opacity-70",
   /* Panel lateral (drawer) */
   drawer:
-    "fixed inset-y-0 right-0 z-50 flex w-full max-w-[460px] flex-col border-l border-line bg-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-card before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-linear-to-b before:from-cyan before:via-transparent before:to-indigo before:content-['']",
+    "fixed inset-y-0 right-0 z-50 flex w-full max-w-[460px] animate-slide-in flex-col border-l border-line bg-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-card before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-linear-to-b before:from-cyan before:via-transparent before:to-indigo before:content-['']",
   dHead: "flex items-start gap-3 border-b border-line px-5 py-[18px]",
   dTitle: "m-0 flex-1 font-display text-lg font-semibold tracking-tight text-balance",
   dClose: "px-1.5 py-0.5 text-[22px] leading-none text-muted transition hover:text-fg",

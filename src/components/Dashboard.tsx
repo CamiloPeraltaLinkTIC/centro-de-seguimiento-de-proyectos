@@ -237,7 +237,7 @@ export default function Dashboard({ user, role, initialFrentes, initialResponsab
             )}
           </div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-            {frentes.map((fd) => {
+            {frentes.map((fd, idx) => {
               const ts = tasks.filter((t) => t.frente_id === fd.id);
               const n = ts.length;
               const c = ts.filter((t) => t.estado === "Cerrada").length;
@@ -262,8 +262,8 @@ export default function Dashboard({ user, role, initialFrentes, initialResponsab
                       strokeWidth="5"
                       strokeLinecap="round"
                       pathLength={100}
-                      className="stroke-(--c) drop-shadow-[0_0_4px_var(--c)] transition-[stroke-dasharray] duration-1000"
-                      style={{ strokeDasharray: `${fp} 100` }}
+                      className="animate-ring-fill stroke-(--c) drop-shadow-[0_0_4px_var(--c)] transition-[stroke-dasharray] duration-1000"
+                      style={{ strokeDasharray: `${fp} 100`, animationDelay: `${0.3 + idx * 0.08}s` }}
                     />}
                   </svg>
                   <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5">
@@ -417,7 +417,7 @@ export default function Dashboard({ user, role, initialFrentes, initialResponsab
         </section>
       </main>
 
-      {(taskDrawer || frDrawer || rsDrawer) && <div className="fixed inset-0 z-40 bg-[rgba(3,6,16,.6)] backdrop-blur-[3px]" onClick={closeAll} />}
+      {(taskDrawer || frDrawer || rsDrawer) && <div className="fixed inset-0 z-40 animate-fade-in bg-[rgba(3,6,16,.6)] backdrop-blur-[3px] [animation-duration:.3s]" onClick={closeAll} />}
 
       {taskDrawer && (
         <TaskDrawer
