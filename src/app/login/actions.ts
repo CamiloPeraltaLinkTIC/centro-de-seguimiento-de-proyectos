@@ -28,7 +28,11 @@ export async function login(_prev: LoginState, form: FormData): Promise<LoginSta
     .select("id", { count: "exact", head: true })
     .eq("ip", ip)
     .gte("created_at", since);
-  if (countError) return { error: "No se pudo verificar el ingreso. Intenta de nuevo." };
+  if (countError) {
+    // El detalle (p. ej. PGRST106: el esquema "seguimiento" no está en "Exposed schemas") queda solo en el log del servidor.
+    console.error("[login] no se pudo consultar seguimiento.intentos_ingreso:", countError.code, countError.message, countError.hint ?? "");
+    return { error: "No se pudo verificar el ingreso. Intenta de nuevo." };
+  }
   if ((count ?? 0) >= MAX_FAILS) {
     await audit({ usuario: user, rol: null, accion: "login_bloqueado", resumen: `Ingreso bloqueado por exceso de intentos (${WINDOW_MIN} min)` });
     return { error: `Demasiados intentos. Espera ${WINDOW_MIN} minutos e inténtalo de nuevo.` };
