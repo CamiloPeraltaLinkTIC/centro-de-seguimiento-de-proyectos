@@ -9,14 +9,15 @@ import FrentesDrawer, { type FrenteDraft } from "./FrentesDrawer";
 import Gantt, { type GanttHandle } from "./Gantt";
 import ResponsablesDrawer, { type ResponsableDraft } from "./ResponsablesDrawer";
 import TaskDrawer from "./TaskDrawer";
+import UserMenu from "./UserMenu";
 
-type Props = { email: string; role: Role; initialFrentes: Frente[]; initialResponsables: Responsable[]; initialTasks: Task[] };
+type Props = { user: string; role: Role; initialFrentes: Frente[]; initialResponsables: Responsable[]; initialTasks: Task[] };
 type Sync = { s: "idle" | "live" | "saving" | "error"; txt: string };
 const POLL_MS = 15000;
 export type Filters = { estado: string; frente: string; resp: string; q: string };
 
-export default function Dashboard({ email, role, initialFrentes, initialResponsables, initialTasks }: Props) {
-  const canWrite = role === "admin";
+export default function Dashboard({ user, role, initialFrentes, initialResponsables, initialTasks }: Props) {
+  const canWrite = role === "admin" || role === "editor";
   const TODAY = useMemo(() => todayUTC(), []);
 
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -41,6 +42,12 @@ export default function Dashboard({ email, role, initialFrentes, initialResponsa
   const busy = useRef(0);
   const reload = useCallback(async () => {
     const r = await api.getBoard().catch(() => null);
+    if (r && !r.ok && r.error === "Sesión expirada.") {
+      // Navegación completa: /sesion/expirada es un route handler que limpia la cookie.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/sesion/expirada");
+      return false;
+    }
     if (!r?.ok) {
       setSync({ s: "error", txt: "Conexión perdida" });
       return false;
@@ -195,9 +202,10 @@ export default function Dashboard({ email, role, initialFrentes, initialResponsa
   return (
     <>
       <Band>
-        <span className="sync" data-s={sync.s} title={`${email} · ${role === "admin" ? "Administrador" : "Lector"}`}>
+        <span className="sync" data-s={sync.s}>
           {sync.txt}
         </span>
+        <UserMenu user={user} role={role} />
       </Band>
 
       <main className="wrap">

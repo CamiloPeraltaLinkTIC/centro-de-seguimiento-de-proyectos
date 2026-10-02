@@ -1,6 +1,7 @@
 /*
- * Autenticación con usuario y contraseña definidos en variables de entorno del servidor.
- * Usa solo Web Crypto para funcionar igual en el proxy y en las server actions.
+ * Sesiones firmadas (HMAC-SHA256, Web Crypto) para funcionar igual en el proxy y en el servidor.
+ * El proxy solo verifica la firma; getSession() (session.ts) además confirma contra la tabla
+ * seguimiento.usuarios que el usuario siga activo y no haya cambiado su rol ni su contraseña.
  * No importar desde componentes de cliente.
  */
 import type { Role } from "@/lib/gantt";
@@ -8,34 +9,25 @@ import type { Role } from "@/lib/gantt";
 export const SESSION_COOKIE = "cs_session";
 export const SESSION_TTL_S = 12 * 60 * 60; // 12 horas
 
-export type Session = { role: Role; user: string; exp: number };
-type Cuenta = { role: Role; user: string; pass: string };
+/** uid: id del usuario · v: huella de su contraseña/rol/estado · exp: expiración (epoch s). */
+export type SessionToken = { uid: string; role: Role; v: string; exp: number };
 
 const enc = new TextEncoder();
 
-function env(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Falta la variable de entorno ${name}.`);
-  return v;
-}
+/** Normaliza el usuario: sin tildes, sin mayúsculas ("Audry.Muñoz" → "audry.munoz"). */
+export const normUser = (u: string) =>
+  u
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase();
 
-function cuentas(): Cuenta[] {
-  const list: Cuenta[] = [
-    { role: "admin", user: env("ADMIN_USERNAME"), pass: env("ADMIN_PASSWORD") },
-    { role: "lector", user: env("LECTOR_USERNAME"), pass: env("LECTOR_PASSWORD") },
-  ];
-  if (list.some((c) => c.pass.length < 12)) throw new Error("Las contraseñas deben tener al menos 12 caracteres.");
-  if (list[0].user.toLowerCase() === list[1].user.toLowerCase()) throw new Error("ADMIN_USERNAME y LECTOR_USERNAME deben ser distintos.");
-  return list;
-}
-
-function sessionSecret() {
-  const s = env("SESSION_SECRET");
+function secret() {
+  const s = process.env.SESSION_SECRET ?? "";
   if (s.length < 32) throw new Error("SESSION_SECRET debe tener al menos 32 caracteres.");
   return s;
 }
 
-/* ---------- utilidades ---------- */
 const b64url = (buf: ArrayBuffer | Uint8Array) =>
   btoa(String.fromCharCode(...new Uint8Array(buf)))
     .replace(/\+/g, "-")
@@ -43,59 +35,34 @@ const b64url = (buf: ArrayBuffer | Uint8Array) =>
     .replace(/=+$/, "");
 const fromB64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 
-/** Comparación en tiempo constante (sobre los hashes, para no filtrar longitudes). */
-async function safeEqual(a: string, b: string) {
-  const [ha, hb] = await Promise.all([crypto.subtle.digest("SHA-256", enc.encode(a)), crypto.subtle.digest("SHA-256", enc.encode(b))]);
-  const x = new Uint8Array(ha);
-  const y = new Uint8Array(hb);
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
-  return diff === 0;
+const hmacKey = () => crypto.subtle.importKey("raw", enc.encode(secret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+
+/** Huella que cambia si cambia la contraseña, el rol o el estado del usuario (invalida sus sesiones). */
+export async function fingerprint(u: { password_hash: string; rol: string; activo: boolean }) {
+  const h = await crypto.subtle.digest("SHA-256", enc.encode(`${u.password_hash}|${u.rol}|${u.activo}`));
+  return b64url(h).slice(0, 22);
 }
 
-/**
- * La llave de firma depende del secreto y de la contraseña del rol:
- * al cambiar una contraseña se invalidan las sesiones abiertas de ese rol.
- */
-async function signingKey(c: Cuenta) {
-  return crypto.subtle.importKey("raw", enc.encode(`${sessionSecret()}\u0000${c.role}\u0000${c.user}\u0000${c.pass}`), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-    "verify",
-  ]);
-}
-
-/* ---------- API ---------- */
-export async function checkCredentials(user: string, pass: string): Promise<Cuenta | null> {
-  let match: Cuenta | null = null;
-  // Se evalúan todas las cuentas siempre, sin cortar antes, para no filtrar información por tiempo.
-  for (const c of cuentas()) {
-    const ok = (await safeEqual(user.trim().toLowerCase(), c.user.toLowerCase())) && (await safeEqual(pass, c.pass));
-    if (ok) match = c;
-  }
-  return match;
-}
-
-export async function createSessionToken(c: Cuenta) {
-  const payload: Session = { role: c.role, user: c.user, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S };
+export async function createSessionToken(t: Omit<SessionToken, "exp">) {
+  const payload: SessionToken = { ...t, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S };
   const body = b64url(enc.encode(JSON.stringify(payload)));
-  const sig = await crypto.subtle.sign("HMAC", await signingKey(c), enc.encode(body));
+  const sig = await crypto.subtle.sign("HMAC", await hmacKey(), enc.encode(body));
   return `${body}.${b64url(sig)}`;
 }
 
-export async function verifySessionToken(token: string | undefined): Promise<Session | null> {
+/** Verifica firma y expiración (sin consultar la base de datos). */
+export async function verifySessionToken(token: string | undefined): Promise<SessionToken | null> {
   if (!token || token.length > 2048) return null;
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  let payload: Session;
   try {
-    payload = JSON.parse(new TextDecoder().decode(fromB64url(body)));
+    if (!(await crypto.subtle.verify("HMAC", await hmacKey(), fromB64url(sig), enc.encode(body)))) return null;
+    const p = JSON.parse(new TextDecoder().decode(fromB64url(body))) as SessionToken;
+    if (typeof p.uid !== "string" || typeof p.v !== "string" || typeof p.exp !== "number" || p.exp < Date.now() / 1000) return null;
+    return p;
   } catch {
     return null;
   }
-  const c = cuentas().find((x) => x.role === payload?.role);
-  if (!c || payload.user !== c.user || typeof payload.exp !== "number" || payload.exp < Date.now() / 1000) return null;
-  const ok = await crypto.subtle.verify("HMAC", await signingKey(c), fromB64url(sig), enc.encode(body));
-  return ok ? payload : null;
 }
 
 export const sessionCookieOptions = {

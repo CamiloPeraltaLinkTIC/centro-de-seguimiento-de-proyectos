@@ -7,12 +7,12 @@ import { db } from "@/lib/supabase/server";
 
 export default async function Home() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) redirect("/sesion/expirada");
 
   const [fr, rs, ts] = await Promise.all([
     db().from("frentes").select("id,nombre,color,orden"),
     db().from("responsables").select("id,nombre"),
-    db().from("tasks").select(TASK_COLS),
+    db().from("actividades").select(TASK_COLS),
   ]);
   const error = fr.error ?? rs.error ?? ts.error;
   if (error) throw new Error(`No se pudieron leer los datos de Supabase: ${error.message}`);
@@ -22,7 +22,7 @@ export default async function Home() {
 
   return (
     <DashboardLoader
-      email={session.user}
+      user={session.user}
       role={session.role}
       initialFrentes={(frentes ?? []) as Frente[]}
       initialResponsables={(responsables ?? []) as Responsable[]}

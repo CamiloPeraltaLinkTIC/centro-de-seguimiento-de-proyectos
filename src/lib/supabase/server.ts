@@ -3,10 +3,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
 /**
- * Cliente de Supabase SOLO para el servidor, con la secret key.
+ * Cliente de Supabase SOLO para el servidor, con la secret key, apuntando al esquema propio `seguimiento`.
  * La autorización (sesión y rol) la hacen las server actions antes de usarlo.
  */
-let client: SupabaseClient<Database> | null = null;
+let client: SupabaseClient<Database, "seguimiento"> | null = null;
 
 export function db() {
   if (client) return client;
@@ -14,7 +14,10 @@ export function db() {
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) throw new Error("Faltan las variables de entorno SUPABASE_URL y SUPABASE_SECRET_KEY.");
   assertSecretKey(key);
-  client = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+  client = createClient<Database, "seguimiento">(url, key, {
+    db: { schema: "seguimiento" },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
   return client;
 }
 

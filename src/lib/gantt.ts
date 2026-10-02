@@ -1,5 +1,6 @@
 export type Estado = "Pendiente" | "En curso" | "Cerrada";
-export type Role = "admin" | "lector";
+export type Role = "admin" | "editor" | "lector";
+export const ROLE_LABEL: Record<Role, string> = { admin: "Administrador", editor: "Editor", lector: "Lector" };
 
 export type Frente = {
   id: string;
