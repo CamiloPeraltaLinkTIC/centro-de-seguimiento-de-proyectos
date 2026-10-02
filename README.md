@@ -32,7 +32,8 @@ El sistema visual se inspira en el Centro de Mando Digital LinkTIC: la misma pal
 - **Historial** (`/historial`, solo administradores): inicios y cierres de sesión, ingresos fallidos o bloqueados, y cada creación, edición o eliminación, con el usuario, la IP y los valores de antes y después. El historial no se puede modificar ni borrar.
 - El tablero se actualiza solo cada 15 segundos (y al volver a la pestaña) con los cambios de otros usuarios.
 - **Documentación** (`/documentos`): PDFs del proyecto en un bucket privado de Supabase Storage.
-  - Administradores y editores suben PDFs (máximo 50 MB); todos los roles los ven; solo los administradores los eliminan.
+  - **Solo los administradores** suben y eliminan PDFs (máximo 50 MB). Editores y lectores ven todos los documentos; la lista se actualiza sola cada 30 segundos y marca como **Nuevo** lo que cada persona aún no ha abierto.
+  - **Tarjetas con portada:** al subir un PDF, el navegador del administrador dibuja la primera página y la guarda como portada (JPEG, en el mismo bucket privado). Se muestra una vista previa antes de subir. Los documentos sin portada la generan la primera vez que un administrador los abre.
   - **Visor de solo lectura:** el PDF se dibuja en el navegador con PDF.js, sin el visor nativo ni su botón de descarga. El archivo nunca tiene enlace directo: la ruta que lo entrega rechaza cualquier petición que no venga del visor de la app.
   - Se bloquean clic derecho, Ctrl/Cmd+S, Ctrl/Cmd+P e imprimir. Ninguna web puede impedir del todo una captura de pantalla.
   - **Cada apertura queda en el historial** ("Documento visto"). Los administradores ven en cada documento quién lo abrió y cuándo, y el total de vistas en la lista.
@@ -45,8 +46,9 @@ Todo vive en el esquema propio **`seguimiento`**, así no choca con otros proyec
 1. En **SQL Editor**, ejecuta en orden:
    1. `supabase/migrations/0001_seguimiento.sql`: esquema, tablas, historial y permisos.
    2. `supabase/migrations/0002_documentos.sql`: tabla de documentos y bucket privado `seguimiento-documentos`.
-   3. `supabase/seed.sql`: datos iniciales (6 frentes, 17 responsables, 38 actividades). Si ya hay actividades, no inserta nada.
-   4. El SQL de usuarios iniciales (ver *Usuarios iniciales*).
+   3. `supabase/migrations/0003_portadas.sql`: portadas de los documentos.
+   4. `supabase/seed.sql`: datos iniciales (6 frentes, 17 responsables, 38 actividades). Si ya hay actividades, no inserta nada.
+   5. El SQL de usuarios iniciales (ver *Usuarios iniciales*).
 2. En **Project Settings → API → Data API → Exposed schemas**, agrega `seguimiento` y guarda. Es seguro: el esquema solo da permisos al rol del servidor (`service_role`).
 3. En **Project Settings → API Keys**, copia la *Project URL* y la **Secret key** (`sb_secret_…`, o `service_role` en proyectos antiguos). **No** la publishable: con ella la app no arranca.
 

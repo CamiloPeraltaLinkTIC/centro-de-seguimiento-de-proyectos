@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { confirmarPortada, prepararPortada } from "@/app/documentos/actions";
+import { canvasAPortada, cargarPdfjs, subirFirmado } from "@/lib/pdf-cover";
 import { cn, ui } from "@/lib/ui";
 import { BirdPulse } from "./Loader";
 
-type Props = { docId: string };
+type Props = { docId: string; generarPortada?: boolean };
 
 /**
  * Visor de PDF de solo lectura.
@@ -14,7 +16,7 @@ type Props = { docId: string };
  * - Se bloquean clic derecho, arrastrar, Ctrl/Cmd+S y Ctrl/Cmd+P, y la impresión muestra una página en blanco.
  * Nota: ninguna web puede impedir del todo una captura de pantalla.
  */
-export default function PdfViewer({ docId }: Props) {
+export default function PdfViewer({ docId, generarPortada = false }: Props) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState(1);
@@ -30,8 +32,7 @@ export default function PdfViewer({ docId }: Props) {
         const res = await fetch(`/documentos/${docId}/archivo`, { headers: { "x-visor": "1" }, cache: "no-store", credentials: "same-origin" });
         if (!res.ok) throw new Error((await res.text()) || "No se pudo cargar el documento.");
         const data = new Uint8Array(await res.arrayBuffer());
-        const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
+        const pdfjs = await cargarPdfjs();
         const loading = pdfjs.getDocument({
           data,
           enableXfa: false,
@@ -109,7 +110,7 @@ export default function PdfViewer({ docId }: Props) {
           </div>
         ) : (
           <div className="grid justify-items-center gap-4">
-            {width > 0 && pages.map((n) => <Pagina key={`${n}-${zoom}-${width}`} pdf={pdf} n={n} ancho={(width - 8) * zoom} />)}
+            {width > 0 && pages.map((n) => <Pagina key={`${n}-${zoom}-${width}`} pdf={pdf} n={n} ancho={(width - 8) * zoom} onLista={n === 1 && generarPortada ? (c) => guardarPortada(docId, c) : undefined} />)}
           </div>
         )}
       </div>
@@ -119,7 +120,7 @@ export default function PdfViewer({ docId }: Props) {
 }
 
 /** Una página: se dibuja solo cuando entra en pantalla (o está cerca). */
-function Pagina({ pdf, n, ancho }: { pdf: PDFDocumentProxy; n: number; ancho: number }) {
+function Pagina({ pdf, n, ancho, onLista }: { pdf: PDFDocumentProxy; n: number; ancho: number; onLista?: (c: HTMLCanvasElement) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [ratio, setRatio] = useState(1.414);
   const [lista, setLista] = useState(false);
@@ -149,6 +150,7 @@ function Pagina({ pdf, n, ancho }: { pdf: PDFDocumentProxy; n: number; ancho: nu
           return;
         }
         setLista(true);
+        onLista?.(canvas);
       },
       { rootMargin: "600px 0px" },
     );
@@ -157,6 +159,8 @@ function Pagina({ pdf, n, ancho }: { pdf: PDFDocumentProxy; n: number; ancho: nu
       io.disconnect();
       task?.cancel();
     };
+    // onLista solo se usa una vez, al terminar de dibujar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdf, n, ancho]);
 
   return (
@@ -166,4 +170,15 @@ function Pagina({ pdf, n, ancho }: { pdf: PDFDocumentProxy; n: number; ancho: nu
       <span className="absolute right-2 bottom-2 rounded bg-black/55 px-1.5 py-0.5 font-mono text-[10px] text-white">{n}</span>
     </div>
   );
+}
+
+/** Documentos subidos antes de existir las portadas: el visor de un administrador genera la suya una sola vez. */
+let portadaEnCurso = "";
+async function guardarPortada(docId: string, canvas: HTMLCanvasElement) {
+  if (portadaEnCurso === docId) return;
+  portadaEnCurso = docId;
+  const blob = await canvasAPortada(canvas);
+  const prep = blob ? await prepararPortada(docId) : null;
+  if (!blob || !prep?.ok) return;
+  if (await subirFirmado(prep.data.url, blob)) await confirmarPortada(docId, prep.data.path);
 }
