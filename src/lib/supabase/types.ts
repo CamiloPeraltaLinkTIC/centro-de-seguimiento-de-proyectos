@@ -44,6 +44,18 @@ export type HistorialRow = {
   ip: string | null;
 };
 type IntentoRow = { id: number; ip: string; created_at: string };
+export type DocumentoRow = {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  categoria: string;
+  archivo: string;
+  tamano: number;
+  subido_por: string;
+  created_at: string;
+  eliminado_at: string | null;
+  eliminado_por: string | null;
+};
 
 /** Tipos del esquema `seguimiento` (supabase/migrations/0001_seguimiento.sql). */
 export type Database = {
@@ -55,6 +67,7 @@ export type Database = {
       actividades: Table<ActividadRow, Omit<ActividadRow, "id" | "created_at" | "updated_at"> & { id?: string }>;
       historial: Table<HistorialRow, Omit<HistorialRow, "id" | "created_at">>;
       intentos_ingreso: Table<IntentoRow, { ip: string; created_at?: string }>;
+      documentos: Table<DocumentoRow, Omit<DocumentoRow, "id" | "created_at" | "eliminado_at" | "eliminado_por"> & { eliminado_at?: string | null; eliminado_por?: string | null }>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

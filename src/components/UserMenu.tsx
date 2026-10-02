@@ -21,7 +21,7 @@ const iniciales = (u: string) =>
     .toUpperCase();
 
 /** Usuario, rol, accesos de administración, tema y cierre de sesión. */
-export default function UserMenu({ user, role, current }: { user: string; role: Role; current?: "historial" | "usuarios" }) {
+export default function UserMenu({ user, role, current }: { user: string; role: Role; current?: "historial" | "usuarios" | "documentos" }) {
   return (
     <span className="inline-flex items-center gap-2">
       <span
@@ -34,6 +34,16 @@ export default function UserMenu({ user, role, current }: { user: string; role: 
         {user}
       </span>
       <span className={cn("rounded-full border px-2 py-[3px] text-[10.5px] font-bold uppercase tracking-[.08em] max-md:hidden", ROLE_BADGE[role])}>{ROLE_LABEL[role]}</span>
+      {current !== "documentos" && (
+        <Link className={ui.out} href="/documentos">
+          Documentos
+        </Link>
+      )}
+      {current && (
+        <Link className={ui.out} href="/">
+          Tablero
+        </Link>
+      )}
       {role === "admin" && current !== "usuarios" && (
         <Link className={ui.out} href="/usuarios">
           Usuarios

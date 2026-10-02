@@ -1,16 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 
+/** Origen de Supabase, permitido solo para que el navegador suba PDFs con un permiso firmado (sin llaves). */
+function storageOrigin() {
+  try {
+    return process.env.SUPABASE_URL ? ` ${new URL(process.env.SUPABASE_URL).origin}` : "";
+  } catch {
+    return "";
+  }
+}
+
 function contentSecurityPolicy(nonce: string) {
   const isDev = process.env.NODE_ENV === "development";
   return `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""};
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""};
+    worker-src 'self' blob:;
     style-src 'self' 'nonce-${nonce}';
     style-src-attr 'unsafe-inline';
     img-src 'self' blob: data:;
-    font-src 'self';
-    connect-src 'self';
+    font-src 'self' data: blob:;
+    connect-src 'self'${storageOrigin()};
     object-src 'none';
     base-uri 'self';
     form-action 'self';

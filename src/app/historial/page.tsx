@@ -31,6 +31,9 @@ const ACCIONES: Record<string, { label: string; tipo: string }> = {
   usuario_editado: { label: "Usuario editado", tipo: "edita" },
   usuario_password: { label: "Contraseña restablecida", tipo: "edita" },
   migracion: { label: "Migración de datos", tipo: "crea" },
+  documento_subido: { label: "Documento subido", tipo: "crea" },
+  documento_visto: { label: "Documento visto", tipo: "login" },
+  documento_eliminado: { label: "Documento eliminado", tipo: "elimina" },
 };
 
 const CAMPOS: Record<string, string> = {
@@ -52,6 +55,8 @@ const CAMPOS: Record<string, string> = {
   frentes: "Frentes",
   responsables: "Responsables",
   actividades: "Actividades",
+  categoria: "Categoría",
+  tamano: "Tamaño (bytes)",
 };
 
 const fecha = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", dateStyle: "medium", timeStyle: "short" });
