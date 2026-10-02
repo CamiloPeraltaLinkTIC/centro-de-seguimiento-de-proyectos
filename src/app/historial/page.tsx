@@ -30,6 +30,7 @@ const ACCIONES: Record<string, { label: string; tipo: string }> = {
   usuario_creado: { label: "Usuario creado", tipo: "crea" },
   usuario_editado: { label: "Usuario editado", tipo: "edita" },
   usuario_password: { label: "Contraseña restablecida", tipo: "edita" },
+  migracion: { label: "Migración de datos", tipo: "crea" },
 };
 
 const CAMPOS: Record<string, string> = {
@@ -48,6 +49,9 @@ const CAMPOS: Record<string, string> = {
   rol: "Rol",
   activo: "Activo",
   usuario: "Usuario",
+  frentes: "Frentes",
+  responsables: "Responsables",
+  actividades: "Actividades",
 };
 
 const fecha = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", dateStyle: "medium", timeStyle: "short" });

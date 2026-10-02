@@ -44,7 +44,15 @@ Todo vive en el esquema propio **`seguimiento`**, así no choca con otros proyec
 2. En **Project Settings → API → Data API → Exposed schemas**, agrega `seguimiento` y guarda. Es seguro: el esquema solo da permisos al rol del servidor (`service_role`).
 3. En **Project Settings → API Keys**, copia la *Project URL* y la **Secret key** (`sb_secret_…`, o `service_role` en proyectos antiguos). **No** la publishable: con ella la app no arranca.
 
-Si ejecutaste scripts de versiones anteriores (que creaban tablas en `public`), revisa `supabase/diagnostico_version_anterior.sql` **antes** de borrar nada: confirma que esas tablas no son de otro proyecto.
+### Si ya usabas la versión anterior (tablas en `public`)
+
+Para conservar lo que ya se había editado, ejecuta `supabase/migrar_datos_version_anterior.sql` **después** de `0001_seguimiento.sql`. El script:
+
+- copia frentes, responsables y actividades de `public` a `seguimiento`, reemplazando la semilla, con los mismos ids y fechas;
+- no modifica `public`;
+- se detiene sin cambiar nada si ya hay cambios hechos desde la app nueva.
+
+Cuando confirmes que todo está bien, revisa `supabase/diagnostico_version_anterior.sql` para borrar las tablas anteriores. Antes de borrar, confirma que no son de otro proyecto.
 
 ### Usuarios iniciales
 
