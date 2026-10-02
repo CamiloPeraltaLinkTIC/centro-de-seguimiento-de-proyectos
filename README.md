@@ -1,7 +1,18 @@
 # Centro de seguimiento de proyectos
 
 Tablero de seguimiento de proyectos de LinkTIC. Proyecto inicial: plan de trabajo MATERAN (creación, expectativa y lanzamiento de marca).
-Next.js 16 + Supabase (Postgres), listo para desplegar en Vercel.
+Next.js 16 + Tailwind CSS v4 + Supabase (Postgres), listo para desplegar en Vercel.
+
+## Diseño
+
+El sistema visual se inspira en el Centro de Mando Digital LinkTIC: la misma paleta de marca y las fuentes **Clash Display** (títulos y cifras) y **Nexa** (texto), más JetBrains Mono para fechas y datos. Es más plano y legible, pensado para el trabajo diario.
+
+- **Pista de lanzamiento:** panorama del plan completo, con un carril por frente y cada actividad como una cápsula de color según su estado. Muestra la línea de *hoy*, el cierre del plan y las próximas entregas. Un clic en un carril filtra por ese frente; un clic en una cápsula abre la actividad.
+- **Avance y ritmo:** avance ponderado con contador animado, tiempo transcurrido frente a avance real (puntos adelante o detrás) y días para el cierre.
+- **Barra de estados:** cada actividad es un segmento. Un clic abre la actividad, y la leyenda filtra por estado.
+- **Frentes:** tarjetas con anillo de progreso, actividades atrasadas y la próxima entrega.
+- **Temas oscuro (por defecto) y claro**, con selector en la barra superior. La elección se recuerda en el navegador.
+- Estilos 100 % con utilidades de Tailwind. Los tokens de tema, las animaciones y unas pocas utilidades propias (borde degradado, grilla del Gantt) están en `src/app/globals.css`, y las combinaciones reutilizables en `src/lib/ui.ts`.
 
 ## Funcionalidades
 
