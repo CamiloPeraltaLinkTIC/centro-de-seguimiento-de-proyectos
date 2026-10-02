@@ -33,8 +33,8 @@ El sistema visual se inspira en el Centro de Mando Digital LinkTIC: la misma pal
 - El tablero se actualiza solo cada 15 segundos (y al volver a la pestaña) con los cambios de otros usuarios.
 - **Documentación** (`/documentos`): PDFs del proyecto en un bucket privado de Supabase Storage.
   - Administradores y editores suben PDFs (máximo 50 MB); todos los roles los ven; solo los administradores los eliminan.
-  - **Visor de solo lectura:** el PDF se dibuja en el navegador con PDF.js, sin el visor nativo ni su botón de descarga, y con marca de agua (usuario, fecha y hora) dentro de cada página. El archivo nunca tiene enlace directo: la ruta que lo entrega rechaza cualquier petición que no venga del visor de la app.
-  - Se bloquean clic derecho, Ctrl/Cmd+S, Ctrl/Cmd+P e imprimir. Ninguna web puede impedir del todo una captura de pantalla; la marca de agua identifica a quien la hizo.
+  - **Visor de solo lectura:** el PDF se dibuja en el navegador con PDF.js, sin el visor nativo ni su botón de descarga. El archivo nunca tiene enlace directo: la ruta que lo entrega rechaza cualquier petición que no venga del visor de la app.
+  - Se bloquean clic derecho, Ctrl/Cmd+S, Ctrl/Cmd+P e imprimir. Ninguna web puede impedir del todo una captura de pantalla.
   - **Cada apertura queda en el historial** ("Documento visto"). Los administradores ven en cada documento quién lo abrió y cuándo, y el total de vistas en la lista.
 - En la barra superior: usuario, rol, accesos a **Usuarios** e **Historial** (administradores) y botón **Cerrar sesión**.
 

@@ -27,8 +27,6 @@ export default async function DocumentoPage({ params }: PageProps<"/documentos/[
       ? ((await db().from("historial").select("id,created_at,usuario,rol,ip").eq("accion", "documento_visto").eq("entidad_id", id).order("created_at", { ascending: false }).limit(200)).data ?? [])
       : null;
 
-  const marca = `${s.user} · ${fecha.format(new Date())} · Confidencial`;
-
   return (
     <>
       <Band contexto="Documentación">
@@ -49,7 +47,7 @@ export default async function DocumentoPage({ params }: PageProps<"/documentos/[
         </div>
 
         <div className={cn("grid gap-5", vistas && "xl:grid-cols-[minmax(0,1fr)_320px]")}>
-          <PdfViewer docId={doc.id} marca={marca} />
+          <PdfViewer docId={doc.id} />
           {vistas && (
             <aside className={cn(ui.panel, "grid content-start gap-3 self-start p-4 xl:sticky xl:top-[78px]")}>
               <p className={ui.eyebrow}>
