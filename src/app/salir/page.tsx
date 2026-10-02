@@ -1,5 +1,6 @@
 import Link from "next/link";
-import Band from "@/components/Band";
+import AuthCard from "@/components/AuthCard";
+import { ui } from "@/lib/ui";
 import { logout } from "../login/actions";
 
 export const metadata = { title: "Cerrar sesión · Centro de seguimiento de proyectos" };
@@ -7,25 +8,21 @@ export const metadata = { title: "Cerrar sesión · Centro de seguimiento de pro
 // Cierre de sesión por POST (formulario): evita que un enlace externo cierre la sesión del usuario.
 export default function SalirPage() {
   return (
-    <>
-      <Band />
-      <main className="login">
-        <form className="login-card" action={logout}>
-          <div>
-            <h1>
-              Cerrar <em>sesión</em>
-            </h1>
-            <span className="rule" aria-hidden="true" />
-            <p className="sub">¿Quieres salir del centro de seguimiento?</p>
-          </div>
-          <button className="btn primary" type="submit">
-            Cerrar sesión
-          </button>
-          <Link className="btn" href="/" style={{ textAlign: "center", textDecoration: "none", color: "inherit" }}>
-            Volver al tablero
-          </Link>
-        </form>
-      </main>
-    </>
+    <AuthCard>
+      <form className="grid gap-4" action={logout}>
+        <div className="grid gap-2">
+          <h1 className="m-0 font-display text-[28px] leading-tight font-semibold tracking-[-.03em]">
+            Cerrar <em className="text-gradient-title not-italic">sesión</em>
+          </h1>
+          <p className="m-0 text-muted">¿Quieres salir del centro de seguimiento?</p>
+        </div>
+        <button className={`${ui.btnPrimary} py-2.5 text-sm`} type="submit">
+          Cerrar sesión
+        </button>
+        <Link className={`${ui.btn} py-2.5 text-sm`} href="/">
+          Volver al tablero
+        </Link>
+      </form>
+    </AuthCard>
   );
 }

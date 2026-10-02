@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PAL } from "@/lib/gantt";
+import { cn, ui } from "@/lib/ui";
 import type { Frente, Task } from "@/lib/gantt";
 
 export type FrenteDraft = { key: string; id: string | null; nombre: string; color: string; del: boolean };
@@ -16,9 +17,18 @@ type Props = {
 
 function Palette({ cur, onPick }: { cur: string; onPick: (c: string) => void }) {
   return (
-    <div className="palette">
+    <div className="col-span-full flex flex-wrap gap-1.5 pt-1 pb-0.5">
       {PAL.map(([c, n]) => (
-        <button key={c} type="button" style={{ background: c }} title={n} aria-label={n} aria-pressed={c === cur} onClick={() => onPick(c)} />
+        <button
+          key={c}
+          type="button"
+          className="size-6 rounded-md border-2 border-surface p-0 ring-1 ring-line transition aria-pressed:ring-2 aria-pressed:ring-fg"
+          style={{ background: c }}
+          title={n}
+          aria-label={n}
+          aria-pressed={c === cur}
+          onClick={() => onPick(c)}
+        />
       ))}
     </div>
   );
@@ -72,43 +82,43 @@ export default function FrentesDrawer({ frentes, tasks, focusNew, onClose, onSav
   }
 
   return (
-    <aside className="drawer" role="dialog" aria-labelledby="feTitle">
-      <div className="d-head">
-        <h2 id="feTitle">
-          Gestionar <em>frentes</em>
+    <aside className={ui.drawer} role="dialog" aria-labelledby="feTitle">
+      <div className={ui.dHead}>
+        <h2 id="feTitle" className={ui.dTitle}>
+          Gestionar <em className="not-italic text-link">frentes</em>
         </h2>
-        <button className="x" onClick={onClose} aria-label="Cerrar">
+        <button className={ui.dClose} onClick={onClose} aria-label="Cerrar">
           ×
         </button>
       </div>
-      <div className="d-body">
-        <p className="fe-intro">Renombra, cambia el color, reordena o agrega frentes de trabajo. Al renombrar un frente, sus actividades se mueven con él.</p>
-        <div className="fe-list">
-          {draft.length === 0 && <p className="none">Aún no hay frentes. Agrega el primero abajo.</p>}
+      <div className={ui.dBody}>
+        <p className="m-0 text-[13px] text-muted">Renombra, cambia el color, reordena o agrega frentes de trabajo. Al renombrar un frente, sus actividades se mueven con él.</p>
+        <div className="grid gap-2">
+          {draft.length === 0 && <p className="m-0 text-[13px] text-muted">Aún no hay frentes. Agrega el primero abajo.</p>}
           {draft.map((d, i) => {
             const n = d.id ? tasks.filter((t) => t.frente_id === d.id).length : 0;
             return (
-              <div className={`fe-row ${d.del ? "del" : ""}`} key={d.key}>
+              <div className={cn(ui.feRow, "grid-cols-[auto_minmax(0,1fr)_auto_auto]", d.del && "opacity-50 [&_input]:line-through")} key={d.key}>
                 <button
                   type="button"
-                  className="swatch"
+                  className={ui.swatch}
                   style={{ background: d.color }}
                   aria-label="Cambiar color"
                   disabled={d.del}
                   onClick={() => setOpenPal(openPal === i ? -1 : i)}
                 />
-                <input className="field" aria-label="Nombre del frente" disabled={d.del} value={d.nombre} onChange={(e) => patch(i, { nombre: e.target.value })} />
-                <span className="cnt2">{n} act.</span>
-                <span className="fe-tools">
-                  <button type="button" className="ib" aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)}>
+                <input className={ui.fieldFull} aria-label="Nombre del frente" disabled={d.del} value={d.nombre} onChange={(e) => patch(i, { nombre: e.target.value })} />
+                <span className="font-mono text-[11.5px] whitespace-nowrap text-muted">{n} act.</span>
+                <span className="flex gap-0.5">
+                  <button type="button" className={ui.iconBtn} aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)}>
                     ↑
                   </button>
-                  <button type="button" className="ib" aria-label="Bajar" disabled={i === draft.length - 1} onClick={() => move(i, 1)}>
+                  <button type="button" className={ui.iconBtn} aria-label="Bajar" disabled={i === draft.length - 1} onClick={() => move(i, 1)}>
                     ↓
                   </button>
                   <button
                     type="button"
-                    className="ib rm"
+                    className={cn(ui.iconBtn, ui.iconBtnRm)}
                     aria-label={d.del ? "Restaurar" : "Eliminar"}
                     title={n ? "Mueve o elimina sus actividades antes de borrar el frente" : d.del ? "Restaurar" : "Eliminar"}
                     disabled={n > 0}
@@ -130,10 +140,10 @@ export default function FrentesDrawer({ frentes, tasks, focusNew, onClose, onSav
             );
           })}
         </div>
-        <div className="fe-new">
-          <button type="button" className="swatch" style={{ background: newColor }} aria-label="Color del nuevo frente" onClick={() => setNewPal(!newPal)} />
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-[10px] border border-dashed border-brand/50 bg-accent-soft p-2.5">
+          <button type="button" className={ui.swatch} style={{ background: newColor }} aria-label="Color del nuevo frente" onClick={() => setNewPal(!newPal)} />
           <input
-            className="field"
+            className={ui.fieldFull}
             ref={newRef}
             placeholder="Nombre del nuevo frente"
             value={newName}
@@ -145,7 +155,7 @@ export default function FrentesDrawer({ frentes, tasks, focusNew, onClose, onSav
               }
             }}
           />
-          <button type="button" className="btn primary" onClick={addNew}>
+          <button type="button" className={ui.btnPrimary} onClick={addNew}>
             Agregar
           </button>
           {newPal && (
@@ -159,12 +169,12 @@ export default function FrentesDrawer({ frentes, tasks, focusNew, onClose, onSav
           )}
         </div>
       </div>
-      <div className="d-foot">
-        <span className="msg">{msg}</span>
-        <button className="btn" type="button" onClick={onClose}>
+      <div className={ui.dFoot}>
+        <span className={ui.dMsg}>{msg}</span>
+        <button className={ui.btn} type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button className="btn primary" type="button" disabled={busy} onClick={save}>
+        <button className={ui.btnPrimary} type="button" disabled={busy} onClick={save}>
           Guardar cambios
         </button>
       </div>

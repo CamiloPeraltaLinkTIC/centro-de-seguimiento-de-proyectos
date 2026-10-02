@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import Band from "@/components/Band";
 import UserMenu from "@/components/UserMenu";
+import PageHeader from "@/components/PageHeader";
 import { getSession } from "@/lib/session";
+import { ui } from "@/lib/ui";
 import { listarUsuarios } from "./actions";
 import UsuariosPanel from "./UsuariosPanel";
 
@@ -20,19 +22,18 @@ export default async function UsuariosPage() {
       <Band>
         <UserMenu user={session.user} role={session.role} current="usuarios" />
       </Band>
-      <main className="wrap">
-        <div className="head">
-          <div>
-            <h1>
-              Gestión de <em>usuarios</em>
-            </h1>
-            <span className="rule" aria-hidden="true" />
-            <p className="sub">Crea usuarios, asigna su rol, desactívalos o restablece su contraseña. Todo queda en el historial.</p>
-          </div>
-          <Link className="btn" href="/">
-            ← Volver al tablero
-          </Link>
-        </div>
+      <main className={ui.page}>
+        <PageHeader
+          eyebrow="Administración"
+          title="Gestión de"
+          highlight="usuarios"
+          sub="Crea usuarios, asigna su rol, desactívalos o restablece su contraseña. Todo queda en el historial."
+          action={
+            <Link className={ui.btn} href="/">
+              ← Volver al tablero
+            </Link>
+          }
+        />
         <UsuariosPanel initial={r.data} selfId={session.id} />
       </main>
     </>

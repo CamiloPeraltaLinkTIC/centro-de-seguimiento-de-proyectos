@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DAY, fmt, pd } from "@/lib/gantt";
+import { cn, ui } from "@/lib/ui";
 import type { Estado, Frente, Responsable, Task, TaskInput } from "@/lib/gantt";
 
 const NUEVO = "__nuevo__";
@@ -140,31 +141,31 @@ export default function TaskDrawer(props: Props) {
   const ro = !canWrite;
 
   return (
-    <aside className="drawer" role="dialog" aria-labelledby="dTitle">
-      <div className="d-head">
-        <h2 id="dTitle">
+    <aside className={ui.drawer} role="dialog" aria-labelledby="dTitle">
+      <div className={ui.dHead}>
+        <h2 id="dTitle" className={ui.dTitle}>
           {task ? (
             `#${task.num} · ${task.actividad}`
           ) : (
             <>
-              Nueva <em>actividad</em>
+              Nueva <em className="not-italic text-link">actividad</em>
             </>
           )}
         </h2>
-        <button className="x" onClick={onClose} aria-label="Cerrar">
+        <button className={ui.dClose} onClick={onClose} aria-label="Cerrar">
           ×
         </button>
       </div>
-      <form className="d-body" autoComplete="off" onSubmit={(e) => e.preventDefault()}>
-        <label>
+      <form className={ui.dBody} autoComplete="off" onSubmit={(e) => e.preventDefault()}>
+        <label className={ui.label}>
           Actividad
-          <input className="field" ref={first} required disabled={ro} value={actividad} onChange={(e) => setActividad(e.target.value)} />
+          <input className={ui.fieldFull} ref={first} required disabled={ro} value={actividad} onChange={(e) => setActividad(e.target.value)} />
         </label>
-        <div className="two">
-          <label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className={ui.label}>
             Frente
             <select
-              className="field"
+              className={ui.fieldFull}
               disabled={ro}
               value={frenteSel}
               onChange={(e) => {
@@ -180,10 +181,10 @@ export default function TaskDrawer(props: Props) {
               {canWrite && <option value={NUEVO}>+ Nuevo frente…</option>}
             </select>
           </label>
-          <label>
+          <label className={ui.label}>
             Responsable
             <select
-              className="field"
+              className={ui.fieldFull}
               disabled={ro}
               value={resp}
               onChange={(e) => {
@@ -202,56 +203,56 @@ export default function TaskDrawer(props: Props) {
           </label>
         </div>
         {frenteSel === NUEVO && (
-          <label>
+          <label className={ui.label}>
             Nombre del nuevo frente
-            <input className="field" ref={frRef} placeholder="Ej. Logística, Pauta digital…" value={nuevoFrente} onChange={(e) => setNuevoFrente(e.target.value)} />
+            <input className={ui.fieldFull} ref={frRef} placeholder="Ej. Logística, Pauta digital…" value={nuevoFrente} onChange={(e) => setNuevoFrente(e.target.value)} />
           </label>
         )}
         {resp === NUEVO && (
-          <label>
+          <label className={ui.label}>
             Nombre del nuevo responsable
-            <input className="field" ref={rsRef} placeholder="Ej. Ana Gómez - Diseño" value={nuevoResp} onChange={(e) => setNuevoResp(e.target.value)} />
+            <input className={ui.fieldFull} ref={rsRef} placeholder="Ej. Ana Gómez - Diseño" value={nuevoResp} onChange={(e) => setNuevoResp(e.target.value)} />
           </label>
         )}
         <div>
-          <p className="lbl" style={{ marginBottom: 6 }}>
+          <p className="m-0 mb-1.5 text-[11px] font-bold uppercase tracking-[.1em] text-muted">
             Estado
           </p>
-          <div className="states">
+          <div className="grid grid-cols-3 gap-1.5">
             {(
               [
-                ["Pendiente", "s-Pendiente"],
-                ["En curso", "s-En"],
-                ["Cerrada", "s-Cerrada"],
+                ["Pendiente", "aria-pressed:border-todo aria-pressed:bg-todo/15 aria-pressed:text-fg"],
+                ["En curso", "aria-pressed:border-run aria-pressed:bg-run/15 aria-pressed:text-run"],
+                ["Cerrada", "aria-pressed:border-ok aria-pressed:bg-ok/15 aria-pressed:text-ok"],
               ] as const
             ).map(([v, cls]) => (
-              <button key={v} type="button" className={cls} aria-pressed={estado === v} disabled={ro} onClick={() => pickEstado(v)}>
+              <button key={v} type="button" className={cn("rounded-lg border border-line bg-surface-2 px-1 py-2 text-[12.5px] font-bold text-muted transition enabled:hover:border-brand", cls)} aria-pressed={estado === v} disabled={ro} onClick={() => pickEstado(v)}>
                 {v}
               </button>
             ))}
           </div>
         </div>
-        <label>
+        <label className={ui.label}>
           Avance
-          <div className="range">
-            <input type="range" min={0} max={100} step={5} disabled={ro} value={avance} onChange={(e) => pickAvance(+e.target.value)} />
-            <output>{avance}%</output>
+          <div className="flex items-center gap-2.5">
+            <input className="flex-1 accent-brand" type="range" min={0} max={100} step={5} disabled={ro} value={avance} onChange={(e) => pickAvance(+e.target.value)} />
+            <output className="w-11 text-right font-mono text-fg">{avance}%</output>
           </div>
         </label>
-        <div className="two">
-          <label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className={ui.label}>
             Inicio
-            <input className="field" type="date" required disabled={ro} value={inicio} onChange={(e) => setInicio(e.target.value)} />
+            <input className={ui.fieldFull} type="date" required disabled={ro} value={inicio} onChange={(e) => setInicio(e.target.value)} />
           </label>
-          <label>
+          <label className={ui.label}>
             Fin
-            <input className="field" type="date" required disabled={ro} value={fin} onChange={(e) => setFin(e.target.value)} />
+            <input className={ui.fieldFull} type="date" required disabled={ro} value={fin} onChange={(e) => setFin(e.target.value)} />
           </label>
         </div>
-        <label>
+        <label className={ui.label}>
           Notas de seguimiento
           <textarea
-            className="field"
+            className={ui.fieldFull}
             rows={4}
             disabled={ro}
             placeholder="Bloqueos, acuerdos, próximos pasos…"
@@ -260,18 +261,18 @@ export default function TaskDrawer(props: Props) {
           />
         </label>
       </form>
-      <div className="d-foot">
+      <div className={ui.dFoot}>
         {canWrite && task && (
-          <button className={`btn danger ${delArmed ? "armed" : ""}`} type="button" onClick={del}>
+          <button className={delArmed ? ui.btnDangerArmed : ui.btnDanger} type="button" onClick={del}>
             {delArmed ? "Confirmar eliminación" : "Eliminar"}
           </button>
         )}
-        <span className="msg">{msg}</span>
-        <button className="btn" type="button" onClick={onClose}>
+        <span className={ui.dMsg}>{msg}</span>
+        <button className={ui.btn} type="button" onClick={onClose}>
           Cancelar
         </button>
         {canWrite && (
-          <button className="btn primary" type="button" onClick={save}>
+          <button className={ui.btnPrimary} type="button" onClick={save}>
             Guardar
           </button>
         )}

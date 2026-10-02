@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn, ui } from "@/lib/ui";
 import type { Responsable, Task } from "@/lib/gantt";
 
 export type ResponsableDraft = { key: string; id: string | null; nombre: string; del: boolean };
@@ -42,20 +43,20 @@ export default function ResponsablesDrawer({ responsables, tasks, onClose, onSav
   }
 
   return (
-    <aside className="drawer" role="dialog" aria-labelledby="rsTitle">
-      <div className="d-head">
-        <h2 id="rsTitle">
-          Gestionar <em>responsables</em>
+    <aside className={ui.drawer} role="dialog" aria-labelledby="rsTitle">
+      <div className={ui.dHead}>
+        <h2 id="rsTitle" className={ui.dTitle}>
+          Gestionar <em className="not-italic text-link">responsables</em>
         </h2>
-        <button className="x" onClick={onClose} aria-label="Cerrar">
+        <button className={ui.dClose} onClick={onClose} aria-label="Cerrar">
           ×
         </button>
       </div>
-      <div className="d-body">
-        <p className="fe-intro">Corrige nombres o agrega personas y equipos. Al renombrar un responsable, todas sus actividades se actualizan.</p>
-        <div className="fe-new rs-new">
+      <div className={ui.dBody}>
+        <p className="m-0 text-[13px] text-muted">Corrige nombres o agrega personas y equipos. Al renombrar un responsable, todas sus actividades se actualizan.</p>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[10px] border border-dashed border-brand/50 bg-accent-soft p-2.5">
           <input
-            className="field"
+            className={ui.fieldFull}
             placeholder="Nombre del nuevo responsable"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
@@ -66,21 +67,21 @@ export default function ResponsablesDrawer({ responsables, tasks, onClose, onSav
               }
             }}
           />
-          <button type="button" className="btn primary" onClick={addNew}>
+          <button type="button" className={ui.btnPrimary} onClick={addNew}>
             Agregar
           </button>
         </div>
-        <div className="fe-list">
-          {draft.length === 0 && <p className="none">Aún no hay responsables.</p>}
+        <div className="grid gap-2">
+          {draft.length === 0 && <p className="m-0 text-[13px] text-muted">Aún no hay responsables.</p>}
           {draft.map((d, i) => {
             const n = d.id ? tasks.filter((t) => t.responsable_id === d.id).length : 0;
             return (
-              <div className={`fe-row rs-row ${d.del ? "del" : ""}`} key={d.key}>
-                <input className="field" aria-label="Nombre del responsable" disabled={d.del} value={d.nombre} onChange={(e) => patch(i, { nombre: e.target.value })} />
-                <span className="cnt2">{n} act.</span>
+              <div className={cn(ui.feRow, "grid-cols-[minmax(0,1fr)_auto_auto]", d.del && "opacity-50 [&_input]:line-through")} key={d.key}>
+                <input className={ui.fieldFull} aria-label="Nombre del responsable" disabled={d.del} value={d.nombre} onChange={(e) => patch(i, { nombre: e.target.value })} />
+                <span className="font-mono text-[11.5px] whitespace-nowrap text-muted">{n} act.</span>
                 <button
                   type="button"
-                  className="ib rm"
+                  className={cn(ui.iconBtn, ui.iconBtnRm)}
                   aria-label={d.del ? "Restaurar" : "Eliminar"}
                   title={n ? "Reasigna sus actividades antes de eliminarlo" : d.del ? "Restaurar" : "Eliminar"}
                   disabled={n > 0}
@@ -93,12 +94,12 @@ export default function ResponsablesDrawer({ responsables, tasks, onClose, onSav
           })}
         </div>
       </div>
-      <div className="d-foot">
-        <span className="msg">{msg}</span>
-        <button className="btn" type="button" onClick={onClose}>
+      <div className={ui.dFoot}>
+        <span className={ui.dMsg}>{msg}</span>
+        <button className={ui.btn} type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button className="btn primary" type="button" disabled={busy} onClick={save}>
+        <button className={ui.btnPrimary} type="button" disabled={busy} onClick={save}>
           Guardar cambios
         </button>
       </div>

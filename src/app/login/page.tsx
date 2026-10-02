@@ -1,15 +1,12 @@
-import Band from "@/components/Band";
+import AuthCard from "@/components/AuthCard";
 import LoginForm from "./LoginForm";
 
 export const metadata = { title: "Ingresar · Centro de seguimiento de proyectos" };
 
 export default function LoginPage() {
   return (
-    <>
-      <Band />
-      <main className="login">
-        <LoginForm />
-      </main>
-    </>
+    <AuthCard>
+      <LoginForm />
+    </AuthCard>
   );
 }

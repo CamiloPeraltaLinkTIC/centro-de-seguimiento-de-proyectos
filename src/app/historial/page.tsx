@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import Band from "@/components/Band";
 import UserMenu from "@/components/UserMenu";
 import { ROLE_LABEL } from "@/lib/gantt";
+import PageHeader from "@/components/PageHeader";
 import { getSession } from "@/lib/session";
+import { cn, tag, ui } from "@/lib/ui";
 import { db } from "@/lib/supabase/server";
 import type { HistorialRow, Json } from "@/lib/supabase/types";
 
@@ -58,15 +60,15 @@ function Detalle({ d }: { d: Json | null }) {
   const entries = Object.entries(d);
   if (!entries.length) return null;
   return (
-    <ul className="chg">
+    <ul className="m-0 mt-1.5 grid list-none gap-0.5 p-0 text-xs text-muted">
       {entries.map(([k, v]) => {
         const isDiff = v && typeof v === "object" && !Array.isArray(v) && "antes" in v && "despues" in v;
         return (
           <li key={k}>
-            <b>{CAMPOS[k] ?? k}:</b>{" "}
+            <b className="font-bold text-fg">{CAMPOS[k] ?? k}:</b>{" "}
             {isDiff ? (
               <>
-                <del>{val((v as { antes: Json }).antes)}</del> → <ins>{val((v as { despues: Json }).despues)}</ins>
+                <del className="text-late">{val((v as { antes: Json }).antes)}</del> → <ins className="text-ok no-underline">{val((v as { despues: Json }).despues)}</ins>
               </>
             ) : (
               val(v)
@@ -116,22 +118,21 @@ export default async function HistorialPage({ searchParams }: PageProps<"/histor
       <Band>
         <UserMenu user={session.user} role={session.role} current="historial" />
       </Band>
-      <main className="wrap">
-        <div className="head">
-          <div>
-            <h1>
-              Historial de <em>cambios</em>
-            </h1>
-            <span className="rule" aria-hidden="true" />
-            <p className="sub">Inicios de sesión y todo lo que se crea, edita o elimina en el tablero.</p>
-          </div>
-          <Link className="btn" href="/">
-            ← Volver al tablero
-          </Link>
-        </div>
+      <main className={ui.page}>
+        <PageHeader
+          eyebrow="Administración"
+          title="Historial de"
+          highlight="cambios"
+          sub="Inicios de sesión y todo lo que se crea, edita o elimina en el tablero."
+          action={
+            <Link className={ui.btn} href="/">
+              ← Volver al tablero
+            </Link>
+          }
+        />
 
-        <form className="h-filters" method="get">
-          <select className="field" name="usuario" defaultValue={usuario} aria-label="Usuario">
+        <form className={cn(ui.panel, "flex flex-wrap items-center gap-2.5 p-2.5")} method="get">
+          <select className={ui.field} name="usuario" defaultValue={usuario} aria-label="Usuario">
             <option value="">Todos los usuarios</option>
             {(usuarios ?? []).map((u) => (
               <option key={u.nombre} value={u.nombre}>
@@ -139,7 +140,7 @@ export default async function HistorialPage({ searchParams }: PageProps<"/histor
               </option>
             ))}
           </select>
-          <select className="field" name="accion" defaultValue={accion} aria-label="Acción">
+          <select className={ui.field} name="accion" defaultValue={accion} aria-label="Acción">
             <option value="">Todas las acciones</option>
             {Object.entries(ACCIONES).map(([k, a]) => (
               <option key={k} value={k}>
@@ -147,27 +148,27 @@ export default async function HistorialPage({ searchParams }: PageProps<"/histor
               </option>
             ))}
           </select>
-          <button className="btn primary" type="submit">
+          <button className={ui.btnPrimary} type="submit">
             Filtrar
           </button>
           {(usuario || accion) && (
-            <Link className="btn" href="/historial">
+            <Link className={ui.btn} href="/historial">
               Limpiar
             </Link>
           )}
-          <span className="spacer" />
-          <span className="num">{count ?? 0} registros</span>
+          <span className="flex-1" />
+          <span className="font-mono text-xs text-muted">{count ?? 0} registros</span>
         </form>
 
-        <div className="h-wrap">
+        <div className={ui.tableWrap}>
           {rows.length ? (
-            <table className="h-table">
+            <table className={ui.table}>
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Usuario</th>
-                  <th>Acción</th>
-                  <th>Detalle</th>
+                  <th className={ui.th}>Fecha</th>
+                  <th className={ui.th}>Usuario</th>
+                  <th className={ui.th}>Acción</th>
+                  <th className={ui.th}>Detalle</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,20 +176,20 @@ export default async function HistorialPage({ searchParams }: PageProps<"/histor
                   const a = ACCIONES[r.accion] ?? { label: r.accion, tipo: "" };
                   return (
                     <tr key={r.id}>
-                      <td className="f">{fecha.format(new Date(r.created_at))}</td>
-                      <td className="u">
-                        <b>{r.usuario}</b>
-                        <small>
+                      <td className={ui.tdDate}>{fecha.format(new Date(r.created_at))}</td>
+                      <td className={ui.td}>
+                        <b className="block font-bold">{r.usuario}</b>
+                        <small className="text-xs text-muted">
                           {r.rol ? ROLE_LABEL[r.rol] : "—"}
                           {r.ip ? ` · ${r.ip}` : ""}
                         </small>
                       </td>
-                      <td>
-                        <span className="acc" data-t={a.tipo}>
+                      <td className={ui.td}>
+                        <span className={cn(tag.base, tag[(a.tipo || "neutral") as keyof typeof tag])}>
                           {a.label}
                         </span>
                       </td>
-                      <td>
+                      <td className={ui.td}>
                         {r.resumen}
                         <Detalle d={r.detalle} />
                       </td>
@@ -198,17 +199,17 @@ export default async function HistorialPage({ searchParams }: PageProps<"/histor
               </tbody>
             </table>
           ) : (
-            <div className="empty">
-              <b>Sin registros</b>
+            <div className={ui.emptyState}>
+              <b className={ui.emptyTitle}>Sin registros</b>
               <span>No hay eventos con estos filtros.</span>
             </div>
           )}
         </div>
 
         {pages > 1 && (
-          <div className="h-pager">
+          <div className="flex items-center justify-end gap-2 text-[13px] text-muted">
             {page > 1 && (
-              <Link className="btn" href={link(page - 1)}>
+              <Link className={ui.btn} href={link(page - 1)}>
                 ← Más recientes
               </Link>
             )}
@@ -216,7 +217,7 @@ export default async function HistorialPage({ searchParams }: PageProps<"/histor
               Página {page} de {pages}
             </span>
             {page < pages && (
-              <Link className="btn" href={link(page + 1)}>
+              <Link className={ui.btn} href={link(page + 1)}>
                 Anteriores →
               </Link>
             )}
