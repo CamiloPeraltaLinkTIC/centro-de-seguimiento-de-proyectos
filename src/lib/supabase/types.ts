@@ -57,6 +57,7 @@ export type DocumentoRow = {
   eliminado_at: string | null;
   eliminado_por: string | null;
 };
+export type DocumentoCategoriaRow = { id: string; nombre: string; created_at: string };
 
 /** Tipos del esquema `seguimiento` (supabase/migrations/0001_seguimiento.sql). */
 export type Database = {
@@ -68,6 +69,7 @@ export type Database = {
       actividades: Table<ActividadRow, Omit<ActividadRow, "id" | "created_at" | "updated_at"> & { id?: string }>;
       historial: Table<HistorialRow, Omit<HistorialRow, "id" | "created_at">>;
       intentos_ingreso: Table<IntentoRow, { ip: string; created_at?: string }>;
+      documento_categorias: Table<DocumentoCategoriaRow, { id?: string; nombre: string }>;
       documentos: Table<DocumentoRow, Omit<DocumentoRow, "id" | "created_at" | "eliminado_at" | "eliminado_por" | "portada"> & { portada?: string | null; eliminado_at?: string | null; eliminado_por?: string | null }>;
     };
     Views: Record<string, never>;

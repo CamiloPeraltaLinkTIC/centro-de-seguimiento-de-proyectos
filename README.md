@@ -35,6 +35,7 @@ El sistema visual se inspira en el Centro de Mando Digital LinkTIC: la misma pal
   - **Solo los administradores** suben y eliminan documentos (PDF o HTML, máximo 50 MB). Editores y lectores ven todos los documentos; la lista se actualiza sola cada 30 segundos y marca como **Nuevo** lo que cada persona aún no ha abierto.
   - **Tarjetas con portada:** al subir un PDF, el navegador del administrador dibuja la primera página y la guarda como portada (JPEG, en el mismo bucket privado). Se muestra una vista previa antes de subir. Los documentos sin portada la generan la primera vez que un administrador los abre.
   - **Visor de solo lectura:** el PDF se dibuja en el navegador con PDF.js, sin el visor nativo ni su botón de descarga. El archivo nunca tiene enlace directo: la ruta que lo entrega rechaza cualquier petición que no venga del visor de la app.
+  - **Filtros por categoría:** los administradores los crean, renombran y eliminan con **Editar filtros**. Al renombrar uno, sus documentos se actualizan; al eliminarlo, pasan a "General" (que no se puede renombrar ni eliminar). Los demás roles solo ven las categorías que tienen documentos.
   - **Presentaciones HTML:** se muestran en un iframe aislado (`sandbox`, con origen propio): sus scripts y estilos funcionan, pero no pueden leer la sesión ni llamar a la app. Igual que el PDF, la ruta que las entrega solo responde al visor de la app. No tienen portada automática; su tarjeta usa un fondo de marca.
   - Se bloquean clic derecho, Ctrl/Cmd+S, Ctrl/Cmd+P e imprimir. Ninguna web puede impedir del todo una captura de pantalla.
   - **Cada apertura queda en el historial** ("Documento visto"). Los administradores ven en cada documento quién lo abrió y cuándo, y el total de vistas en la lista.
@@ -49,8 +50,9 @@ Todo vive en el esquema propio **`seguimiento`**, así no choca con otros proyec
    2. `supabase/migrations/0002_documentos.sql`: tabla de documentos y bucket privado `seguimiento-documentos`.
    3. `supabase/migrations/0003_portadas.sql`: portadas de los documentos.
    4. `supabase/migrations/0004_documentos_html.sql`: permite subir presentaciones HTML.
-   5. `supabase/seed.sql`: datos iniciales (6 frentes, 17 responsables, 38 actividades). Si ya hay actividades, no inserta nada.
-   6. El SQL de usuarios iniciales (ver *Usuarios iniciales*).
+   5. `supabase/migrations/0005_documento_categorias.sql`: categorías (filtros) de la documentación.
+   6. `supabase/seed.sql`: datos iniciales (6 frentes, 17 responsables, 38 actividades). Si ya hay actividades, no inserta nada.
+   7. El SQL de usuarios iniciales (ver *Usuarios iniciales*).
 2. En **Project Settings → API → Data API → Exposed schemas**, agrega `seguimiento` y guarda. Es seguro: el esquema solo da permisos al rol del servidor (`service_role`).
 3. En **Project Settings → API Keys**, copia la *Project URL* y la **Secret key** (`sb_secret_…`, o `service_role` en proyectos antiguos). **No** la publishable: con ella la app no arranca.
 

@@ -4,7 +4,18 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { portadaDeArchivo, subirFirmado } from "@/lib/pdf-cover";
 import { cn, ui } from "@/lib/ui";
-import { confirmarSubida, eliminarDocumento, listarDocumentos, prepararSubida, type Documento, type ListaDocumentos } from "./actions";
+import {
+  confirmarSubida,
+  crearCategoria,
+  eliminarCategoria,
+  eliminarDocumento,
+  listarDocumentos,
+  prepararSubida,
+  renombrarCategoria,
+  type Categoria,
+  type Documento,
+  type ListaDocumentos,
+} from "./actions";
 
 const MAX = 50 * 1024 * 1024;
 const POLL_MS = 30000;
@@ -34,8 +45,15 @@ export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDo
   }, [refrescar]);
 
   const vistos = useMemo(() => new Set(lista.vistos), [lista.vistos]);
-  const categorias = useMemo(() => [...new Set(lista.docs.map((d) => d.categoria))].sort((a, b) => a.localeCompare(b, "es")), [lista.docs]);
-  const filtrados = lista.docs.filter((d) => (!cat || d.categoria === cat) && (!q.trim() || `${d.titulo} ${d.descripcion}`.toLowerCase().includes(q.trim().toLowerCase())));
+  const conteo = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const d of lista.docs) c[d.categoria] = (c[d.categoria] ?? 0) + 1;
+    return c;
+  }, [lista.docs]);
+  // Los lectores solo ven las categorías que tienen documentos; los administradores, todas (para gestionarlas).
+  const categorias = isAdmin ? lista.categorias : lista.categorias.filter((c) => conteo[c.nombre]);
+  const filtroActivo = cat && lista.categorias.some((c) => c.nombre === cat) ? cat : "";
+  const filtrados = lista.docs.filter((d) => (!filtroActivo || d.categoria === filtroActivo) && (!q.trim() || `${d.titulo} ${d.descripcion}`.toLowerCase().includes(q.trim().toLowerCase())));
   const nuevos = lista.docs.filter((d) => !vistos.has(d.id)).length;
 
   async function eliminar(id: string) {
@@ -48,7 +66,7 @@ export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDo
     <>
       {isAdmin && (
         <Subida
-          categorias={categorias}
+          categorias={lista.categorias}
           onSubido={(d) => {
             setLista((l) => ({ ...l, docs: [d, ...l.docs] }));
             setMsg("");
@@ -58,18 +76,18 @@ export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDo
 
       <div className={cn(ui.panel, "flex flex-wrap items-center gap-2.5 p-2.5")}>
         <input className={cn(ui.field, "flex-[1_1_220px] md:max-w-[320px]")} type="search" placeholder="Buscar documento…" aria-label="Buscar documento" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="flex flex-wrap gap-1.5">
-          {["", ...categorias].map((c) => (
-            <button
-              key={c || "todas"}
-              aria-pressed={cat === c}
-              onClick={() => setCat(c)}
-              className="rounded-full border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] font-bold text-muted transition hover:border-brand aria-pressed:border-transparent aria-pressed:bg-linear-to-r aria-pressed:from-brand aria-pressed:to-indigo aria-pressed:text-white"
-            >
-              {c || "Todas"}
-            </button>
-          ))}
-        </div>
+        <Filtros
+          categorias={categorias}
+          conteo={conteo}
+          total={lista.docs.length}
+          activo={filtroActivo}
+          onElegir={setCat}
+          isAdmin={isAdmin}
+          onCambio={(renombre) => {
+            if (renombre && renombre.antes === cat) setCat(renombre.despues);
+            refrescar();
+          }}
+        />
         <span className="flex-1" />
         {nuevos > 0 && <span className="rounded-full bg-cyan/15 px-2.5 py-1 text-xs font-bold text-cyan">{nuevos} sin abrir</span>}
         <span className="font-mono text-xs text-muted">
@@ -96,6 +114,168 @@ export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDo
         </div>
       )}
     </>
+  );
+}
+
+/* ---------- Filtros por categoría (los administradores los crean, renombran y eliminan) ---------- */
+const chip = "rounded-full border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] font-bold text-muted transition hover:border-brand";
+const chipActivo = "aria-pressed:border-transparent aria-pressed:bg-linear-to-r aria-pressed:from-brand aria-pressed:to-indigo aria-pressed:text-white";
+
+function Filtros({
+  categorias,
+  conteo,
+  total,
+  activo,
+  onElegir,
+  isAdmin,
+  onCambio,
+}: {
+  categorias: Categoria[];
+  conteo: Record<string, number>;
+  total: number;
+  activo: string;
+  onElegir: (c: string) => void;
+  isAdmin: boolean;
+  onCambio: (renombre?: { antes: string; despues: string }) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  if (!editando)
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button aria-pressed={!activo} onClick={() => onElegir("")} className={cn(chip, chipActivo)}>
+          Todas <span className="font-mono text-[11px] opacity-70">{total}</span>
+        </button>
+        {categorias.map((c) => (
+          <button key={c.id} aria-pressed={activo === c.nombre} onClick={() => onElegir(c.nombre)} className={cn(chip, chipActivo)}>
+            {c.nombre} <span className="font-mono text-[11px] opacity-70">{conteo[c.nombre] ?? 0}</span>
+          </button>
+        ))}
+        {isAdmin && (
+          <button onClick={() => setEditando(true)} className={cn(chip, "border-dashed")} title="Crear, renombrar o eliminar filtros">
+            ✎ Editar filtros
+          </button>
+        )}
+      </div>
+    );
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {categorias.map((c) => (
+        <ChipEditable key={c.id} c={c} n={conteo[c.nombre] ?? 0} onError={setMsg} onCambio={onCambio} />
+      ))}
+      <NuevaCategoria onError={setMsg} onCambio={onCambio} />
+      <button
+        onClick={() => {
+          setEditando(false);
+          setMsg("");
+        }}
+        className={ui.btnPrimary}
+      >
+        Listo
+      </button>
+      {msg && (
+        <span className="text-[13px] font-bold text-late" role="alert">
+          {msg}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ChipEditable({ c, n, onError, onCambio }: { c: Categoria; n: number; onError: (m: string) => void; onCambio: (renombre?: { antes: string; despues: string }) => void }) {
+  const [nombre, setNombre] = useState(c.nombre);
+  const [armado, setArmado] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const fija = c.nombre === "General";
+
+  async function guardar() {
+    const n2 = nombre.trim();
+    if (!n2 || n2 === c.nombre) return setNombre(c.nombre);
+    setOcupado(true);
+    const r = await renombrarCategoria(c.id, n2);
+    setOcupado(false);
+    if (!r.ok) {
+      setNombre(c.nombre);
+      return onError(r.error);
+    }
+    onError("");
+    onCambio({ antes: c.nombre, despues: r.data.nombre });
+  }
+
+  async function eliminar() {
+    setOcupado(true);
+    const r = await eliminarCategoria(c.id);
+    setOcupado(false);
+    if (!r.ok) return onError(r.error);
+    onError("");
+    onCambio();
+  }
+
+  if (fija)
+    return (
+      <span className={cn(chip, "cursor-default opacity-70")} title="Categoría por defecto: no se puede renombrar ni eliminar">
+        {c.nombre} <span className="font-mono text-[11px]">{n}</span>
+      </span>
+    );
+
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full border border-brand/50 bg-surface-2 py-1 pr-1 pl-2.5", ocupado && "opacity-60")}>
+      <input
+        className="w-[max(6ch,var(--w))] bg-transparent text-[13px] font-bold text-fg outline-none"
+        style={{ "--w": `${nombre.length + 1}ch` } as React.CSSProperties}
+        value={nombre}
+        maxLength={60}
+        disabled={ocupado}
+        aria-label={`Nombre de la categoría ${c.nombre}`}
+        onChange={(e) => setNombre(e.target.value)}
+        onBlur={guardar}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") setNombre(c.nombre);
+        }}
+      />
+      <button
+        onClick={() => (armado ? eliminar() : setArmado(true))}
+        onBlur={() => setArmado(false)}
+        disabled={ocupado}
+        className={cn(
+          "grid min-w-6 place-items-center rounded-full font-bold transition",
+          armado ? "h-6 bg-late px-2 text-[12px] text-white" : "size-6 text-[18px] leading-none text-muted hover:bg-late/15 hover:text-late",
+        )}
+        title={n ? `Sus ${n} documento${n === 1 ? "" : "s"} pasarán a General` : undefined}
+        aria-label={armado ? `Confirmar eliminación de ${c.nombre}` : `Eliminar ${c.nombre}`}
+      >
+        {armado ? (n ? `¿Eliminar? ${n} doc. → General` : "¿Eliminar?") : "×"}
+      </button>
+    </span>
+  );
+}
+
+function NuevaCategoria({ onError, onCambio }: { onError: (m: string) => void; onCambio: () => void }) {
+  const [nombre, setNombre] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  async function crear(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nombre.trim() || ocupado) return;
+    setOcupado(true);
+    const r = await crearCategoria(nombre);
+    setOcupado(false);
+    if (!r.ok) return onError(r.error);
+    onError("");
+    setNombre("");
+    onCambio();
+  }
+
+  return (
+    <form onSubmit={crear} className="inline-flex items-center gap-1 rounded-full border border-dashed border-line bg-surface-2 py-1 pr-1 pl-2.5 focus-within:border-brand">
+      <input className="w-32 bg-transparent text-[13px] font-bold text-fg outline-none placeholder:text-dim" placeholder="Nuevo filtro…" maxLength={60} value={nombre} disabled={ocupado} onChange={(e) => setNombre(e.target.value)} aria-label="Nombre del nuevo filtro" />
+      <button type="submit" disabled={!nombre.trim() || ocupado} className="rounded-full bg-brand px-2 text-[12px] font-bold text-white disabled:opacity-40">
+        + Crear
+      </button>
+    </form>
   );
 }
 
@@ -219,7 +399,7 @@ const tipoArchivo = (f: File) => {
   return null;
 };
 
-function Subida({ categorias, onSubido }: { categorias: string[]; onSubido: (d: Documento) => void }) {
+function Subida({ categorias, onSubido }: { categorias: Categoria[]; onSubido: (d: Documento) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [portada, setPortada] = useState<{ blob: Blob; url: string } | null>(null);
   const [titulo, setTitulo] = useState("");
@@ -277,7 +457,8 @@ function Subida({ categorias, onSubido }: { categorias: string[]; onSubido: (d: 
     }
     const okPortada = portada ? await subirFirmado(prep.data.portadaUrl, portada.blob) : false;
     setEstado({ fase: "verificando", pct: 100 });
-    const r = await confirmarSubida({ path: prep.data.path, portada: okPortada ? prep.data.portadaPath : null, titulo, descripcion, categoria });
+    const cat = categorias.some((c) => c.nombre === categoria) ? categoria : "General";
+    const r = await confirmarSubida({ path: prep.data.path, portada: okPortada ? prep.data.portadaPath : null, titulo, descripcion, categoria: cat });
     setEstado({ fase: "", pct: 0 });
     if (!r.ok) return setMsg(r.error);
     onSubido(r.data);
@@ -327,14 +508,13 @@ function Subida({ categorias, onSubido }: { categorias: string[]; onSubido: (d: 
             </label>
             <label className={ui.label}>
               Categoría
-              <input className={ui.fieldFull} list="doc-cats" required maxLength={60} value={categoria} onChange={(e) => setCategoria(e.target.value)} />
-              <datalist id="doc-cats">
-                {["General", "Estrategia", "Marca", "Legal", "Contratos", "Producto", ...categorias]
-                  .filter((c, i, a) => a.indexOf(c) === i)
-                  .map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-              </datalist>
+              <select className={ui.fieldFull} required value={categorias.some((c) => c.nombre === categoria) ? categoria : "General"} onChange={(e) => setCategoria(e.target.value)}>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.nombre}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
           <label className={ui.label}>

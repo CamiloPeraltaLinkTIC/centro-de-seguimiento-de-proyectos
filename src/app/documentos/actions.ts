@@ -9,13 +9,16 @@ import type { DocumentoRow } from "@/lib/supabase/types";
 
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 export type Documento = Omit<DocumentoRow, "eliminado_at" | "eliminado_por">;
-export type ListaDocumentos = { docs: Documento[]; vistos: string[]; vistas: Record<string, number> };
+export type Categoria = { id: string; nombre: string };
+export type ListaDocumentos = { docs: Documento[]; categorias: Categoria[]; vistos: string[]; vistas: Record<string, number> };
 
 const fail = (error = "No se pudo completar la operación.") => ({ ok: false as const, error });
 const ARCHIVO_RE = /^[0-9a-f-]{36}\.(pdf|html)$/;
 const JPG_RE = /^[0-9a-f-]{36}\.jpg$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SOLO_ADMIN = "Solo los administradores pueden subir documentos.";
+const SOLO_ADMIN_CAT = "Solo los administradores pueden gestionar las categorías.";
+const GENERAL = "General";
 const text = (v: unknown, max: number, required = true) => {
   if (typeof v !== "string") return null;
   const s = v.trim();
@@ -53,11 +56,21 @@ async function urlSubida(path: string) {
 
 /* ---------- lectura ---------- */
 
-/** Documentos visibles, los que el usuario ya abrió (para marcar "Nuevo") y, para administradores, el total de vistas. */
+const ordenar = (cats: Categoria[]) =>
+  cats.sort((a, b) => (a.nombre === GENERAL ? -1 : b.nombre === GENERAL ? 1 : a.nombre.localeCompare(b.nombre, "es")));
+
+/** Categorías en orden alfabético, con "General" primero. Null si la tabla aún no existe (migración 0005 pendiente). */
+async function categorias(): Promise<Categoria[] | null> {
+  const { data, error } = await db().from("documento_categorias").select("id,nombre");
+  if (error) console.error("[documentos] no se pudieron leer las categorías (¿falta la migración 0005?):", error.message);
+  return error ? null : ordenar(data ?? []);
+}
+
+/** Documentos visibles, categorías, los que el usuario ya abrió (para marcar "Nuevo") y, para administradores, el total de vistas. */
 export async function listarDocumentos(): Promise<Result<ListaDocumentos>> {
   const s = await getSession();
   if (!s) return fail("Sesión expirada.");
-  const { data, error } = await db().from("documentos").select(DOC_COLS).is("eliminado_at", null).order("created_at", { ascending: false });
+  const [{ data, error }, cats] = await Promise.all([db().from("documentos").select(DOC_COLS).is("eliminado_at", null).order("created_at", { ascending: false }), categorias()]);
   if (error) return fail();
   const q = db().from("historial").select("entidad_id,usuario").eq("accion", "documento_visto");
   const { data: h } = s.role === "admin" ? await q : await q.eq("usuario", s.user);
@@ -68,7 +81,7 @@ export async function listarDocumentos(): Promise<Result<ListaDocumentos>> {
     if (r.usuario === s.user) vistos.add(r.entidad_id);
     vistas[r.entidad_id] = (vistas[r.entidad_id] ?? 0) + 1;
   }
-  return { ok: true, data: { docs: (data ?? []) as Documento[], vistos: [...vistos], vistas: s.role === "admin" ? vistas : {} } };
+  return { ok: true, data: { docs: (data ?? []) as Documento[], categorias: cats ?? ordenar([...new Set([GENERAL, ...(data ?? []).map((d) => d.categoria)])].map((nombre) => ({ id: nombre, nombre }))), vistos: [...vistos], vistas: s.role === "admin" ? vistas : {} } };
 }
 
 /* ---------- subida (solo administradores) ---------- */
@@ -90,9 +103,13 @@ export async function confirmarSubida(input: { path: string; portada: string | n
   if (!s) return fail(SOLO_ADMIN);
   const titulo = text(input?.titulo, 200);
   const descripcion = text(input?.descripcion ?? "", 1000, false);
-  const categoria = text(input?.categoria || "General", 60);
-  if (!ARCHIVO_RE.test(String(input?.path)) || titulo === null || descripcion === null || categoria === null) return fail("Datos inválidos.");
+  const nombreCat = text(input?.categoria || GENERAL, 60);
+  if (!ARCHIVO_RE.test(String(input?.path)) || titulo === null || descripcion === null || nombreCat === null) return fail("Datos inválidos.");
   if (input.portada !== null && (!JPG_RE.test(String(input.portada)) || input.portada.slice(0, 36) !== input.path.slice(0, 36))) return fail("Datos inválidos.");
+
+  const cats = await categorias();
+  const categoria = cats ? cats.find((c) => c.nombre.toLowerCase() === nombreCat.toLowerCase())?.nombre : nombreCat;
+  if (!categoria) return fail("La categoría no existe. Elige una de la lista.");
 
   const storage = db().storage.from(BUCKET);
   const html = tipoDe(input.path) === "html";
@@ -157,4 +174,54 @@ export async function eliminarDocumento(id: string): Promise<Result> {
   await db().from("documentos").update({ eliminado_at: new Date().toISOString(), eliminado_por: s.user }).eq("id", id);
   await audit({ usuario: s.user, rol: s.role, accion: "documento_eliminado", entidad: "documento", entidadId: id, resumen: doc.titulo });
   return { ok: true, data: undefined };
+}
+
+/* ---------- categorías (filtros, solo administradores) ---------- */
+
+const nombreValido = (v: unknown) => text(v, 60)?.replace(/\s+/g, " ") ?? null;
+const DUPLICADA = "Ya existe una categoría con ese nombre.";
+
+export async function crearCategoria(nombre: string): Promise<Result<Categoria>> {
+  const s = await admin();
+  if (!s) return fail(SOLO_ADMIN_CAT);
+  const n = nombreValido(nombre);
+  if (!n) return fail("El nombre debe tener entre 1 y 60 caracteres.");
+  const { data, error } = await db().from("documento_categorias").insert({ nombre: n }).select("id,nombre").single();
+  if (error?.code === "23505") return fail(DUPLICADA);
+  if (error || !data) return fail();
+  await audit({ usuario: s.user, rol: s.role, accion: "categoria_creada", entidad: "categoria", entidadId: data.id, resumen: n });
+  return { ok: true, data };
+}
+
+/** Renombra una categoría; sus documentos se actualizan solos (llave foránea con on update cascade). */
+export async function renombrarCategoria(id: string, nombre: string): Promise<Result<Categoria>> {
+  const s = await admin();
+  if (!s) return fail(SOLO_ADMIN_CAT);
+  const n = nombreValido(nombre);
+  if (!UUID.test(id) || !n) return fail("El nombre debe tener entre 1 y 60 caracteres.");
+  const { data: antes } = await db().from("documento_categorias").select("id,nombre").eq("id", id).maybeSingle();
+  if (!antes) return fail("La categoría no existe.");
+  if (antes.nombre === GENERAL) return fail("La categoría General no se puede renombrar.");
+  if (antes.nombre === n) return { ok: true, data: antes };
+  const { data, error } = await db().from("documento_categorias").update({ nombre: n }).eq("id", id).select("id,nombre").single();
+  if (error?.code === "23505") return fail(DUPLICADA);
+  if (error || !data) return fail();
+  await audit({ usuario: s.user, rol: s.role, accion: "categoria_editada", entidad: "categoria", entidadId: id, resumen: n, detalle: { nombre: { antes: antes.nombre, despues: n } } });
+  return { ok: true, data };
+}
+
+/** Elimina una categoría; sus documentos pasan a "General". */
+export async function eliminarCategoria(id: string): Promise<Result<{ movidos: number }>> {
+  const s = await admin();
+  if (!s) return fail(SOLO_ADMIN_CAT);
+  if (!UUID.test(id)) return fail();
+  const { data: cat } = await db().from("documento_categorias").select("id,nombre").eq("id", id).maybeSingle();
+  if (!cat) return fail("La categoría no existe.");
+  if (cat.nombre === GENERAL) return fail("La categoría General no se puede eliminar.");
+  const { data: movidos, error: e1 } = await db().from("documentos").update({ categoria: GENERAL }).eq("categoria", cat.nombre).select("id");
+  if (e1) return fail();
+  const { error } = await db().from("documento_categorias").delete().eq("id", id);
+  if (error) return fail();
+  await audit({ usuario: s.user, rol: s.role, accion: "categoria_eliminada", entidad: "categoria", entidadId: id, resumen: cat.nombre, detalle: { documentos_movidos: movidos?.length ?? 0 } });
+  return { ok: true, data: { movidos: movidos?.length ?? 0 } };
 }

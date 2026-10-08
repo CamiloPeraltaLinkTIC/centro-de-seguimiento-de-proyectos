@@ -34,6 +34,9 @@ const ACCIONES: Record<string, { label: string; tipo: string }> = {
   documento_subido: { label: "Documento subido", tipo: "crea" },
   documento_visto: { label: "Documento visto", tipo: "login" },
   documento_eliminado: { label: "Documento eliminado", tipo: "elimina" },
+  categoria_creada: { label: "Categoría creada", tipo: "crea" },
+  categoria_editada: { label: "Categoría editada", tipo: "edita" },
+  categoria_eliminada: { label: "Categoría eliminada", tipo: "elimina" },
 };
 
 const CAMPOS: Record<string, string> = {
