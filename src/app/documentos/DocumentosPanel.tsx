@@ -9,6 +9,7 @@ import { confirmarSubida, eliminarDocumento, listarDocumentos, prepararSubida, t
 const MAX = 50 * 1024 * 1024;
 const POLL_MS = 30000;
 const fecha = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", dateStyle: "medium" });
+const esHtml = (archivo: string) => archivo.endsWith(".html");
 const peso = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
 export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDocumentos; isAdmin: boolean }) {
@@ -103,13 +104,19 @@ function Tarjeta({ d, i, nuevo, vistas, onEliminar }: { d: Documento; i: number;
   const [armado, setArmado] = useState(false);
   return (
     <article className="group relative isolate aspect-[3/4] animate-rise overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition duration-300 hover:-translate-y-1 hover:border-brand/60 hover:shadow-[0_18px_40px_rgba(0,148,255,.22)]" style={{ animationDelay: `${i * 0.05}s` }}>
-      {/* portada o, si no hay, un fondo de marca */}
-      {d.portada ? (
+      {/* portada (o miniatura en vivo si es HTML) o, si no hay, un fondo de marca */}
+      {esHtml(d.archivo) ? (
+        <MiniaturaHtml id={d.id} />
+      ) : d.portada ? (
         <div className="absolute inset-0 -z-10 bg-white bg-cover bg-top transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(/documentos/${d.id}/portada)` }} aria-hidden="true" />
       ) : (
         <div className="absolute inset-0 -z-10 grid place-items-center bg-linear-to-br from-brand/30 via-surface-2 to-indigo/40" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="72" height="72" className="text-sky/50">
-            <path fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6M8 13h8M8 17h5" />
+            {esHtml(d.archivo) ? (
+              <path fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" d="M3 4h18v12H3zM12 16v4m-4 0h8M9.5 8 7.5 10l2 2m5-4 2 2-2 2" />
+            ) : (
+              <path fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6M8 13h8M8 17h5" />
+            )}
           </svg>
         </div>
       )}
@@ -152,13 +159,13 @@ function Tarjeta({ d, i, nuevo, vistas, onEliminar }: { d: Documento; i: number;
         </h2>
         {d.descripcion && <p className="m-0 line-clamp-2 text-xs text-white/70">{d.descripcion}</p>}
         <span className="font-mono text-[11px] text-white/60">
-          {fecha.format(new Date(d.created_at))} · {peso(d.tamano)}
+          {fecha.format(new Date(d.created_at))} · {peso(d.tamano)} · {esHtml(d.archivo) ? "HTML" : "PDF"}
         </span>
         <Link
           href={`/documentos/${d.id}`}
           className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-white/10 py-2 text-[13px] font-bold text-white ring-1 ring-white/20 backdrop-blur transition group-hover:bg-brand group-hover:ring-transparent after:absolute after:inset-0 after:content-['']"
         >
-          Abrir documento
+          {esHtml(d.archivo) ? "Abrir presentación" : "Abrir documento"}
           <span className="transition-transform group-hover:translate-x-0.5" aria-hidden="true">
             →
           </span>
@@ -168,7 +175,50 @@ function Tarjeta({ d, i, nuevo, vistas, onEliminar }: { d: Documento; i: number;
   );
 }
 
+/* ---------- Miniatura en vivo de una presentación HTML ---------- */
+const VIEWPORT = 1100; // ancho al que se dibuja la presentación antes de reducirla al tamaño de la tarjeta
+
+function MiniaturaHtml({ id }: { id: string }) {
+  const caja = useRef<HTMLDivElement>(null);
+  const [tam, setTam] = useState<{ w: number; h: number } | null>(null);
+  const [cargada, setCargada] = useState(false);
+
+  useEffect(() => {
+    const el = caja.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setTam({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const k = tam ? tam.w / VIEWPORT : 0;
+  return (
+    <div ref={caja} className="absolute inset-0 -z-10 overflow-hidden bg-linear-to-br from-brand/30 via-surface-2 to-indigo/40" aria-hidden="true">
+      {tam && (
+        <iframe
+          src={`/documentos/${id}/miniatura`}
+          title=""
+          tabIndex={-1}
+          loading="lazy"
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          onLoad={() => setCargada(true)}
+          className={cn("pointer-events-none origin-top-left border-0 bg-white transition-opacity duration-700", cargada ? "opacity-100" : "opacity-0")}
+          style={{ width: VIEWPORT, height: tam.h / k, transform: `scale(${k})` }}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ---------- Formulario de subida (solo administradores) ---------- */
+const tipoArchivo = (f: File) => {
+  const n = f.name.toLowerCase();
+  if (f.type === "application/pdf" || n.endsWith(".pdf")) return "pdf" as const;
+  if (f.type === "text/html" || n.endsWith(".html") || n.endsWith(".htm")) return "html" as const;
+  return null;
+};
+
 function Subida({ categorias, onSubido }: { categorias: string[]; onSubido: (d: Documento) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [portada, setPortada] = useState<{ blob: Blob; url: string } | null>(null);
@@ -190,11 +240,12 @@ function Subida({ categorias, onSubido }: { categorias: string[]; onSubido: (d: 
   async function elegir(f: File | undefined) {
     setMsg("");
     if (!f) return;
-    if (f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) return setMsg("Solo se pueden subir archivos PDF.");
-    if (f.size > MAX) return setMsg("El PDF debe pesar como máximo 50 MB.");
+    if (!tipoArchivo(f)) return setMsg("Solo se pueden subir archivos PDF o HTML.");
+    if (f.size > MAX) return setMsg("El archivo debe pesar como máximo 50 MB.");
     setFile(f);
     setPortada(null);
-    if (!titulo) setTitulo(f.name.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim());
+    if (!titulo) setTitulo(f.name.replace(/\.(pdf|html?)$/i, "").replace(/[_-]+/g, " ").trim());
+    if (tipoArchivo(f) !== "pdf") return;
     const blob = await portadaDeArchivo(f);
     if (blob) setPortada({ blob, url: URL.createObjectURL(blob) });
   }
@@ -212,13 +263,15 @@ function Subida({ categorias, onSubido }: { categorias: string[]; onSubido: (d: 
     if (!file || estado.fase) return;
     setMsg("");
     setEstado({ fase: "subiendo", pct: 0 });
-    const prep = await prepararSubida(file.size);
+    const prep = await prepararSubida(file.size, tipoArchivo(file) ?? "pdf");
     if (!prep.ok) {
       setEstado({ fase: "", pct: 0 });
       return setMsg(prep.error);
     }
-    const okPdf = await subirFirmado(prep.data.url, file, (pct) => setEstado({ fase: "subiendo", pct }));
-    if (!okPdf) {
+    // Tipo explícito: algunos sistemas no lo informan y el bucket solo acepta PDF y HTML.
+    const tipo = tipoArchivo(file) === "html" ? "text/html" : "application/pdf";
+    const okArchivo = await subirFirmado(prep.data.url, new File([file], file.name, { type: tipo }), (pct) => setEstado({ fase: "subiendo", pct }));
+    if (!okArchivo) {
       setEstado({ fase: "", pct: 0 });
       return setMsg("No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.");
     }
@@ -259,12 +312,12 @@ function Subida({ categorias, onSubido }: { categorias: string[]; onSubido: (d: 
               <svg viewBox="0 0 24 24" width="28" height="28" className="text-brand" aria-hidden="true">
                 <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0-4 4m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />
               </svg>
-              <b className="text-sm">{file ? "Generando portada…" : "Arrastra un PDF o haz clic"}</b>
-              <small className="text-xs text-muted">Solo PDF · máximo 50 MB</small>
+              <b className="text-sm">{!file ? "Arrastra un PDF o HTML, o haz clic" : tipoArchivo(file) === "html" ? "Presentación HTML" : "Generando portada…"}</b>
+              <small className="text-xs text-muted">PDF o HTML · máximo 50 MB</small>
             </span>
           )}
           {file && <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-[11px] text-white">{file.name} · {peso(file.size)}</span>}
-          <input ref={input} type="file" accept="application/pdf,.pdf" className="sr-only" onChange={(e) => elegir(e.target.files?.[0])} />
+          <input ref={input} type="file" accept="application/pdf,.pdf,text/html,.html,.htm" className="sr-only" onChange={(e) => elegir(e.target.files?.[0])} />
         </label>
         <div className="grid content-start gap-3">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">

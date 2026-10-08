@@ -1,5 +1,5 @@
 import { audit } from "@/lib/audit";
-import { BUCKET } from "@/lib/documentos";
+import { BUCKET, tipoDe } from "@/lib/documentos";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/supabase/server";
 
@@ -22,7 +22,7 @@ export async function GET(req: Request, ctx: RouteContext<"/documentos/[id]/arch
   if (!UUID.test(id)) return new Response("No encontrado.", { status: 404 });
 
   const { data: doc } = await db().from("documentos").select("id,titulo,archivo").eq("id", id).is("eliminado_at", null).maybeSingle();
-  if (!doc) return new Response("No encontrado.", { status: 404 });
+  if (!doc || tipoDe(doc.archivo) !== "pdf") return new Response("No encontrado.", { status: 404 });
 
   const { data: blob, error } = await db().storage.from(BUCKET).download(doc.archivo);
   if (error || !blob) {

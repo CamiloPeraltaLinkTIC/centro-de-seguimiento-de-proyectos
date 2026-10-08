@@ -31,9 +31,32 @@ function contentSecurityPolicy(nonce: string) {
     .trim();
 }
 
+/**
+ * Presentaciones HTML subidas por los administradores: corren aisladas (`sandbox` sin allow-same-origin = origen propio,
+ * sin cookies ni acceso a la app), pueden usar sus propios scripts, estilos y recursos externos, y solo se dejan
+ * enmarcar por la app. No pueden enviar formularios ni navegar la página principal.
+ */
+const PRESENTACION_CSP = `
+  sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox;
+  default-src 'none';
+  script-src 'unsafe-inline' 'unsafe-eval' https: data: blob:;
+  style-src 'unsafe-inline' https: data: blob:;
+  img-src https: data: blob:;
+  font-src https: data: blob:;
+  media-src https: data: blob:;
+  connect-src https: data: blob:;
+  frame-src https:;
+  form-action 'none';
+  base-uri 'none';
+  frame-ancestors 'self';
+`
+  .replace(/\s{2,}/g, " ")
+  .trim();
+const PRESENTACION = /^\/documentos\/[0-9a-f-]{36}\/(presentacion|miniatura)$/i;
+
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = contentSecurityPolicy(nonce);
+  const csp = PRESENTACION.test(request.nextUrl.pathname) ? PRESENTACION_CSP : contentSecurityPolicy(nonce);
 
   // Verificación optimista de la sesión; cada server action y página la vuelve a verificar.
   const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);

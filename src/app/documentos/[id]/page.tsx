@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import Band from "@/components/Band";
+import HtmlViewer from "@/components/HtmlViewer";
 import PdfViewer from "@/components/PdfViewer";
 import UserMenu from "@/components/UserMenu";
+import { tipoDe } from "@/lib/documentos";
 import { ROLE_LABEL } from "@/lib/gantt";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/supabase/server";
@@ -19,7 +21,7 @@ export default async function DocumentoPage({ params }: PageProps<"/documentos/[
   const { id } = await params;
   if (!UUID.test(id)) notFound();
 
-  const { data: doc } = await db().from("documentos").select("id,titulo,descripcion,categoria,portada,subido_por,created_at").eq("id", id).is("eliminado_at", null).maybeSingle();
+  const { data: doc } = await db().from("documentos").select("id,titulo,descripcion,categoria,archivo,portada,subido_por,created_at").eq("id", id).is("eliminado_at", null).maybeSingle();
   if (!doc) notFound();
 
   const vistas =
@@ -47,7 +49,7 @@ export default async function DocumentoPage({ params }: PageProps<"/documentos/[
         </div>
 
         <div className={cn("grid gap-5", vistas && "xl:grid-cols-[minmax(0,1fr)_320px]")}>
-          <PdfViewer docId={doc.id} generarPortada={s.role === "admin" && !doc.portada} />
+          {tipoDe(doc.archivo) === "html" ? <HtmlViewer docId={doc.id} titulo={doc.titulo} /> : <PdfViewer docId={doc.id} generarPortada={s.role === "admin" && !doc.portada} />}
           {vistas && (
             <aside className={cn(ui.panel, "grid content-start gap-3 self-start p-4 xl:sticky xl:top-[78px]")}>
               <p className={ui.eyebrow}>

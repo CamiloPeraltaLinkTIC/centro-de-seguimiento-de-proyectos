@@ -12,7 +12,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Las presentaciones HTML se muestran en un iframe del visor de la app (mismo origen).
+      { source: "/documentos/:id/presentacion", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
+      { source: "/documentos/:id/miniatura", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
+    ];
   },
 };
 
