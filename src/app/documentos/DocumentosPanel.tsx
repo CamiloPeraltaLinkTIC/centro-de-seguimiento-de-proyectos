@@ -7,6 +7,7 @@ import { cn, ui } from "@/lib/ui";
 import {
   confirmarSubida,
   crearCategoria,
+  editarDocumento,
   eliminarCategoria,
   eliminarDocumento,
   listarDocumentos,
@@ -28,6 +29,7 @@ export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDo
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [msg, setMsg] = useState("");
+  const [editando, setEditando] = useState<string | null>(null);
 
   // Actualización automática: los documentos nuevos aparecen sin recargar.
   const refrescar = useCallback(async () => {
@@ -104,7 +106,15 @@ export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDo
       {filtrados.length ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-4">
           {filtrados.map((d, i) => (
-            <Tarjeta key={d.id} d={d} i={i} nuevo={!vistos.has(d.id)} vistas={isAdmin ? (lista.vistas[d.id] ?? 0) : null} onEliminar={isAdmin ? () => eliminar(d.id) : undefined} />
+            <Tarjeta
+              key={d.id}
+              d={d}
+              i={i}
+              nuevo={!vistos.has(d.id)}
+              vistas={isAdmin ? (lista.vistas[d.id] ?? 0) : null}
+              onEditar={isAdmin ? () => setEditando(d.id) : undefined}
+              onEliminar={isAdmin ? () => eliminar(d.id) : undefined}
+            />
           ))}
         </div>
       ) : (
@@ -112,6 +122,19 @@ export default function DocumentosPanel({ initial, isAdmin }: { initial: ListaDo
           <b className={ui.emptyTitle}>{lista.docs.length ? "Sin resultados" : "Aún no hay documentos"}</b>
           <span>{lista.docs.length ? "Ningún documento coincide con la búsqueda." : isAdmin ? "Sube el primero con el formulario de arriba." : "Cuando se carguen documentos aparecerán aquí."}</span>
         </div>
+      )}
+
+      {isAdmin && editando && lista.docs.some((d) => d.id === editando) && (
+        <EditarDocumento
+          key={editando}
+          d={lista.docs.find((d) => d.id === editando)!}
+          categorias={lista.categorias}
+          onClose={() => setEditando(null)}
+          onGuardado={(d) => {
+            setLista((l) => ({ ...l, docs: l.docs.map((x) => (x.id === d.id ? d : x)) }));
+            setEditando(null);
+          }}
+        />
       )}
     </>
   );
@@ -280,15 +303,15 @@ function NuevaCategoria({ onError, onCambio }: { onError: (m: string) => void; o
 }
 
 /* ---------- Tarjeta con la portada de fondo ---------- */
-function Tarjeta({ d, i, nuevo, vistas, onEliminar }: { d: Documento; i: number; nuevo: boolean; vistas: number | null; onEliminar?: () => void }) {
+function Tarjeta({ d, i, nuevo, vistas, onEditar, onEliminar }: { d: Documento; i: number; nuevo: boolean; vistas: number | null; onEditar?: () => void; onEliminar?: () => void }) {
   const [armado, setArmado] = useState(false);
   return (
     <article className="group relative isolate aspect-[3/4] animate-rise overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition duration-300 hover:-translate-y-1 hover:border-brand/60 hover:shadow-[0_18px_40px_rgba(0,148,255,.22)]" style={{ animationDelay: `${i * 0.05}s` }}>
       {/* portada (o miniatura en vivo si es HTML) o, si no hay, un fondo de marca */}
       {esHtml(d.archivo) ? (
-        <MiniaturaHtml id={d.id} />
+        <MiniaturaHtml id={d.id} version={d.archivo} />
       ) : d.portada ? (
-        <div className="absolute inset-0 -z-10 bg-white bg-cover bg-top transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(/documentos/${d.id}/portada)` }} aria-hidden="true" />
+        <div className="absolute inset-0 -z-10 bg-white bg-cover bg-top transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(/documentos/${d.id}/portada?v=${d.portada})` }} aria-hidden="true" />
       ) : (
         <div className="absolute inset-0 -z-10 grid place-items-center bg-linear-to-br from-brand/30 via-surface-2 to-indigo/40" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="72" height="72" className="text-sky/50">
@@ -315,6 +338,15 @@ function Tarjeta({ d, i, nuevo, vistas, onEliminar }: { d: Documento; i: number;
             </svg>
             {vistas}
           </span>
+        )}
+        {onEditar && (
+          <button
+            onClick={onEditar}
+            className="relative z-10 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white/80 opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-brand hover:text-white focus-visible:opacity-100"
+            aria-label={`Editar ${d.titulo}`}
+          >
+            Editar
+          </button>
         )}
         {onEliminar && (
           <button
@@ -358,7 +390,7 @@ function Tarjeta({ d, i, nuevo, vistas, onEliminar }: { d: Documento; i: number;
 /* ---------- Miniatura en vivo de una presentación HTML ---------- */
 const VIEWPORT = 1100; // ancho al que se dibuja la presentación antes de reducirla al tamaño de la tarjeta
 
-function MiniaturaHtml({ id }: { id: string }) {
+function MiniaturaHtml({ id, version }: { id: string; version: string }) {
   const caja = useRef<HTMLDivElement>(null);
   const [tam, setTam] = useState<{ w: number; h: number } | null>(null);
   const [cargada, setCargada] = useState(false);
@@ -376,7 +408,8 @@ function MiniaturaHtml({ id }: { id: string }) {
     <div ref={caja} className="absolute inset-0 -z-10 overflow-hidden bg-linear-to-br from-brand/30 via-surface-2 to-indigo/40" aria-hidden="true">
       {tam && (
         <iframe
-          src={`/documentos/${id}/miniatura`}
+          key={version}
+          src={`/documentos/${id}/miniatura?v=${version}`}
           title=""
           tabIndex={-1}
           loading="lazy"
@@ -399,16 +432,30 @@ const tipoArchivo = (f: File) => {
   return null;
 };
 
-function Subida({ categorias, onSubido }: { categorias: Categoria[]; onSubido: (d: Documento) => void }) {
+type Fase = { fase: "" | "subiendo" | "verificando"; pct: number };
+type ArchivoSubido = { path: string; portada: string | null };
+
+/** Sube el archivo (y su portada, si hay) con permisos firmados. Devuelve las rutas para confirmar, o un error. */
+async function subirArchivo(file: File, portada: Blob | null, setEstado: (e: Fase) => void): Promise<{ ok: true; data: ArchivoSubido } | { ok: false; error: string }> {
+  setEstado({ fase: "subiendo", pct: 0 });
+  const prep = await prepararSubida(file.size, tipoArchivo(file) ?? "pdf");
+  if (!prep.ok) return prep;
+  // Tipo explícito: algunos sistemas no lo informan y el bucket solo acepta PDF y HTML.
+  const tipo = tipoArchivo(file) === "html" ? "text/html" : "application/pdf";
+  const okArchivo = await subirFirmado(prep.data.url, new File([file], file.name, { type: tipo }), (pct) => setEstado({ fase: "subiendo", pct }));
+  if (!okArchivo) return { ok: false, error: "No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo." };
+  const okPortada = portada ? await subirFirmado(prep.data.portadaUrl, portada) : false;
+  setEstado({ fase: "verificando", pct: 100 });
+  return { ok: true, data: { path: prep.data.path, portada: okPortada ? prep.data.portadaPath : null } };
+}
+
+/** Archivo elegido por el administrador y su portada (la primera página, si es PDF). */
+function useArchivo(onTitulo: (t: string) => void) {
   const [file, setFile] = useState<File | null>(null);
   const [portada, setPortada] = useState<{ blob: Blob; url: string } | null>(null);
-  const [titulo, setTitulo] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [categoria, setCategoria] = useState("General");
-  const [estado, setEstado] = useState<{ fase: "" | "subiendo" | "verificando"; pct: number }>({ fase: "", pct: 0 });
-  const [msg, setMsg] = useState("");
-  const [drag, setDrag] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState("");
+  // Cambiar la llave vuelve a montar el <input type="file"> vacío (para poder elegir el mismo archivo otra vez).
+  const [inputKey, setInputKey] = useState(0);
 
   useEffect(
     () => () => {
@@ -418,117 +465,270 @@ function Subida({ categorias, onSubido }: { categorias: Categoria[]; onSubido: (
   );
 
   async function elegir(f: File | undefined) {
-    setMsg("");
+    setError("");
     if (!f) return;
-    if (!tipoArchivo(f)) return setMsg("Solo se pueden subir archivos PDF o HTML.");
-    if (f.size > MAX) return setMsg("El archivo debe pesar como máximo 50 MB.");
+    if (!tipoArchivo(f)) return setError("Solo se pueden subir archivos PDF o HTML.");
+    if (f.size > MAX) return setError("El archivo debe pesar como máximo 50 MB.");
     setFile(f);
     setPortada(null);
-    if (!titulo) setTitulo(f.name.replace(/\.(pdf|html?)$/i, "").replace(/[_-]+/g, " ").trim());
+    onTitulo(f.name.replace(/\.(pdf|html?)$/i, "").replace(/[_-]+/g, " ").trim());
     if (tipoArchivo(f) !== "pdf") return;
     const blob = await portadaDeArchivo(f);
     if (blob) setPortada({ blob, url: URL.createObjectURL(blob) });
   }
 
-  function limpiar() {
+  function quitar() {
     setFile(null);
     setPortada(null);
+    setError("");
+    setInputKey((k) => k + 1);
+  }
+
+  return { file, portada, error, inputKey, elegir, quitar };
+}
+
+/** Zona para arrastrar o elegir un PDF/HTML, con la portada como vista previa. `actual` se muestra mientras no se elija otro. */
+function ZonaArchivo({ a, actual, texto }: { a: ReturnType<typeof useArchivo>; actual?: React.ReactNode; texto: string }) {
+  const [drag, setDrag] = useState(false);
+  const { file, portada } = a;
+  return (
+    <label
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        a.elegir(e.dataTransfer.files[0]);
+      }}
+      className={cn(
+        "group relative isolate grid aspect-[3/4] cursor-pointer place-items-center overflow-hidden rounded-xl border-2 border-dashed border-line bg-surface-2 text-center transition hover:border-brand max-lg:max-w-[200px]",
+        drag && "border-brand bg-accent-soft",
+        !!(portada || (!file && actual)) && "border-solid border-brand/60",
+      )}
+    >
+      {portada ? (
+        <span className="absolute inset-0 animate-fade-in bg-white bg-cover bg-top" style={{ backgroundImage: `url(${portada.url})` }} aria-hidden="true" />
+      ) : !file && actual ? (
+        <>
+          {actual}
+          <span className="absolute inset-x-0 bottom-0 bg-black/65 px-2 py-1.5 text-[11.5px] font-bold text-white">{texto}</span>
+        </>
+      ) : (
+        <span className="grid justify-items-center gap-1.5 p-4">
+          <svg viewBox="0 0 24 24" width="28" height="28" className="text-brand" aria-hidden="true">
+            <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0-4 4m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />
+          </svg>
+          <b className="text-sm">{!file ? texto : tipoArchivo(file) === "html" ? "Presentación HTML" : "Generando portada…"}</b>
+          <small className="text-xs text-muted">PDF o HTML · máximo 50 MB</small>
+        </span>
+      )}
+      {file && <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-[11px] text-white">{file.name} · {peso(file.size)}</span>}
+      <input key={a.inputKey} type="file" accept="application/pdf,.pdf,text/html,.html,.htm" className="sr-only" onChange={(e) => a.elegir(e.target.files?.[0])} />
+    </label>
+  );
+}
+
+/** Título, categoría y descripción (compartidos por la subida y la edición). */
+function CamposDocumento({
+  categorias,
+  titulo,
+  setTitulo,
+  categoria,
+  setCategoria,
+  descripcion,
+  setDescripcion,
+  apilado = false,
+}: {
+  categorias: Categoria[];
+  titulo: string;
+  setTitulo: (v: string) => void;
+  categoria: string;
+  setCategoria: (v: string) => void;
+  descripcion: string;
+  setDescripcion: (v: string) => void;
+  apilado?: boolean;
+}) {
+  return (
+    <>
+      <div className={cn("grid gap-3", !apilado && "sm:grid-cols-[minmax(0,1fr)_180px]")}>
+        <label className={ui.label}>
+          Título
+          <input className={ui.fieldFull} required maxLength={200} value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej. Manual de marca MATERAN" />
+        </label>
+        <label className={ui.label}>
+          Categoría
+          <select className={ui.fieldFull} required value={categorias.some((c) => c.nombre === categoria) ? categoria : "General"} onChange={(e) => setCategoria(e.target.value)}>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.nombre}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className={ui.label}>
+        <span>
+          Descripción <small className="font-normal">(opcional)</small>
+        </span>
+        <textarea className={cn(ui.fieldFull, "min-h-20 resize-y")} maxLength={1000} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Para qué sirve o qué versión es" />
+      </label>
+    </>
+  );
+}
+
+function Progreso({ estado }: { estado: Fase }) {
+  return (
+    <>
+      {estado.fase && <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />}
+      {estado.fase === "subiendo" ? `Subiendo… ${estado.pct}%` : estado.fase === "verificando" ? "Verificando…" : null}
+    </>
+  );
+}
+
+/* ---------- Edición de un documento (solo administradores) ---------- */
+function EditarDocumento({ d, categorias, onClose, onGuardado }: { d: Documento; categorias: Categoria[]; onClose: () => void; onGuardado: (d: Documento) => void }) {
+  const [titulo, setTitulo] = useState(d.titulo);
+  const [descripcion, setDescripcion] = useState(d.descripcion);
+  const [categoria, setCategoria] = useState(d.categoria);
+  const [estado, setEstado] = useState<Fase>({ fase: "", pct: 0 });
+  const [msg, setMsg] = useState("");
+  // Al reemplazar el archivo se conserva el título que ya tenía el documento.
+  const a = useArchivo(() => {});
+  const ocupado = !!estado.fase;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !ocupado && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [ocupado, onClose]);
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    if (ocupado) return;
+    setMsg("");
+    let nuevo: ArchivoSubido | null = null;
+    if (a.file) {
+      const up = await subirArchivo(a.file, a.portada?.blob ?? null, setEstado);
+      if (!up.ok) {
+        setEstado({ fase: "", pct: 0 });
+        return setMsg(up.error);
+      }
+      nuevo = up.data;
+    } else setEstado({ fase: "verificando", pct: 100 });
+    const cat = categorias.some((c) => c.nombre === categoria) ? categoria : "General";
+    const r = await editarDocumento(d.id, { titulo, descripcion, categoria: cat, nuevo });
+    setEstado({ fase: "", pct: 0 });
+    if (!r.ok) return setMsg(r.error);
+    onGuardado(r.data);
+  }
+
+  const actual = esHtml(d.archivo) ? (
+    <MiniaturaHtml id={d.id} version={d.archivo} />
+  ) : d.portada ? (
+    <span className="absolute inset-0 -z-10 bg-white bg-cover bg-top" style={{ backgroundImage: `url(/documentos/${d.id}/portada?v=${d.portada})` }} aria-hidden="true" />
+  ) : (
+    <span className="absolute inset-0 -z-10 bg-linear-to-br from-brand/30 via-surface-2 to-indigo/40" aria-hidden="true" />
+  );
+
+  return (
+    <aside className={ui.drawer} role="dialog" aria-labelledby="edTitle">
+      <form className="contents" onSubmit={guardar}>
+        <div className={ui.dHead}>
+          <h2 id="edTitle" className={ui.dTitle}>
+            Editar <em className="not-italic text-link">documento</em>
+          </h2>
+          <button type="button" className={ui.dClose} onClick={onClose} disabled={ocupado} aria-label="Cerrar">
+            ×
+          </button>
+        </div>
+        <div className={ui.dBody}>
+          <div className="grid grid-cols-[150px_minmax(0,1fr)] items-start gap-3">
+            <ZonaArchivo a={a} actual={actual} texto="Clic o arrastra para reemplazar" />
+            <div className="grid gap-1.5 text-[13px] text-muted">
+              <b className="text-fg">Archivo</b>
+              {a.file ? (
+                <>
+                  <span>
+                    Se reemplazará por <b className="text-fg">{a.file.name}</b> ({tipoArchivo(a.file)?.toUpperCase()}, {peso(a.file.size)}).
+                  </span>
+                  <button type="button" className={cn(ui.btn, "justify-self-start")} onClick={a.quitar} disabled={ocupado}>
+                    Conservar el actual
+                  </button>
+                </>
+              ) : (
+                <span>
+                  Actual: {esHtml(d.archivo) ? "HTML" : "PDF"}, {peso(d.tamano)}. Para cambiarlo, elige otro PDF o HTML; el anterior se borra al guardar.
+                </span>
+              )}
+              {a.error && <span className="font-bold text-late">{a.error}</span>}
+            </div>
+          </div>
+          <CamposDocumento categorias={categorias} titulo={titulo} setTitulo={setTitulo} categoria={categoria} setCategoria={setCategoria} descripcion={descripcion} setDescripcion={setDescripcion} apilado />
+        </div>
+        <div className={ui.dFoot}>
+          <span className={ui.dMsg} role="alert">
+            {msg}
+          </span>
+          <button className={ui.btn} type="button" onClick={onClose} disabled={ocupado}>
+            Cancelar
+          </button>
+          <button className={ui.btnPrimary} type="submit" disabled={ocupado}>
+            {ocupado ? <Progreso estado={estado} /> : "Guardar cambios"}
+          </button>
+        </div>
+      </form>
+    </aside>
+  );
+}
+
+/* ---------- Formulario de subida ---------- */
+function Subida({ categorias, onSubido }: { categorias: Categoria[]; onSubido: (d: Documento) => void }) {
+  const [titulo, setTitulo] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [categoria, setCategoria] = useState("General");
+  const [estado, setEstado] = useState<Fase>({ fase: "", pct: 0 });
+  const [msg, setMsg] = useState("");
+  const a = useArchivo((t) => setTitulo((actual) => actual || t));
+
+  function limpiar() {
+    a.quitar();
     setTitulo("");
     setDescripcion("");
-    if (input.current) input.current.value = "";
   }
 
   async function subir(e: React.FormEvent) {
     e.preventDefault();
-    if (!file || estado.fase) return;
+    if (!a.file || estado.fase) return;
     setMsg("");
-    setEstado({ fase: "subiendo", pct: 0 });
-    const prep = await prepararSubida(file.size, tipoArchivo(file) ?? "pdf");
-    if (!prep.ok) {
+    const up = await subirArchivo(a.file, a.portada?.blob ?? null, setEstado);
+    if (!up.ok) {
       setEstado({ fase: "", pct: 0 });
-      return setMsg(prep.error);
+      return setMsg(up.error);
     }
-    // Tipo explícito: algunos sistemas no lo informan y el bucket solo acepta PDF y HTML.
-    const tipo = tipoArchivo(file) === "html" ? "text/html" : "application/pdf";
-    const okArchivo = await subirFirmado(prep.data.url, new File([file], file.name, { type: tipo }), (pct) => setEstado({ fase: "subiendo", pct }));
-    if (!okArchivo) {
-      setEstado({ fase: "", pct: 0 });
-      return setMsg("No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.");
-    }
-    const okPortada = portada ? await subirFirmado(prep.data.portadaUrl, portada.blob) : false;
-    setEstado({ fase: "verificando", pct: 100 });
     const cat = categorias.some((c) => c.nombre === categoria) ? categoria : "General";
-    const r = await confirmarSubida({ path: prep.data.path, portada: okPortada ? prep.data.portadaPath : null, titulo, descripcion, categoria: cat });
+    const r = await confirmarSubida({ ...up.data, titulo, descripcion, categoria: cat });
     setEstado({ fase: "", pct: 0 });
     if (!r.ok) return setMsg(r.error);
     onSubido(r.data);
     limpiar();
   }
 
+  const error = msg || a.error;
   return (
     <form className={cn(ui.panel, "grid gap-3 p-4")} onSubmit={subir}>
       <p className={ui.eyebrow}>Subir documento</p>
       <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <label
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDrag(true);
-          }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDrag(false);
-            elegir(e.dataTransfer.files[0]);
-          }}
-          className={cn(
-            "relative grid aspect-[3/4] cursor-pointer place-items-center overflow-hidden rounded-xl border-2 border-dashed border-line bg-surface-2 text-center transition hover:border-brand max-lg:max-w-[200px]",
-            drag && "border-brand bg-accent-soft",
-            portada && "border-solid border-brand/60",
-          )}
-        >
-          {portada ? (
-            <span className="absolute inset-0 animate-fade-in bg-white bg-cover bg-top" style={{ backgroundImage: `url(${portada.url})` }} aria-hidden="true" />
-          ) : (
-            <span className="grid justify-items-center gap-1.5 p-4">
-              <svg viewBox="0 0 24 24" width="28" height="28" className="text-brand" aria-hidden="true">
-                <path fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0-4 4m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />
-              </svg>
-              <b className="text-sm">{!file ? "Arrastra un PDF o HTML, o haz clic" : tipoArchivo(file) === "html" ? "Presentación HTML" : "Generando portada…"}</b>
-              <small className="text-xs text-muted">PDF o HTML · máximo 50 MB</small>
-            </span>
-          )}
-          {file && <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-[11px] text-white">{file.name} · {peso(file.size)}</span>}
-          <input ref={input} type="file" accept="application/pdf,.pdf,text/html,.html,.htm" className="sr-only" onChange={(e) => elegir(e.target.files?.[0])} />
-        </label>
+        <ZonaArchivo a={a} texto="Arrastra un PDF o HTML, o haz clic" />
         <div className="grid content-start gap-3">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-            <label className={ui.label}>
-              Título
-              <input className={ui.fieldFull} required maxLength={200} value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej. Manual de marca MATERAN" />
-            </label>
-            <label className={ui.label}>
-              Categoría
-              <select className={ui.fieldFull} required value={categorias.some((c) => c.nombre === categoria) ? categoria : "General"} onChange={(e) => setCategoria(e.target.value)}>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.nombre}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className={ui.label}>
-            <span>
-              Descripción <small className="font-normal">(opcional)</small>
-            </span>
-            <textarea className={cn(ui.fieldFull, "min-h-20 resize-y")} maxLength={1000} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Para qué sirve o qué versión es" />
-          </label>
+          <CamposDocumento categorias={categorias} titulo={titulo} setTitulo={setTitulo} categoria={categoria} setCategoria={setCategoria} descripcion={descripcion} setDescripcion={setDescripcion} />
           <div className="flex flex-wrap items-center gap-3">
-            <button className={ui.btnPrimary} type="submit" disabled={!file || !!estado.fase}>
-              {estado.fase && <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />}
-              {estado.fase === "subiendo" ? `Subiendo… ${estado.pct}%` : estado.fase === "verificando" ? "Verificando…" : "Subir documento"}
+            <button className={ui.btnPrimary} type="submit" disabled={!a.file || !!estado.fase}>
+              {estado.fase ? <Progreso estado={estado} /> : "Subir documento"}
             </button>
-            {file && !estado.fase && (
+            {a.file && !estado.fase && (
               <button type="button" className={ui.btn} onClick={limpiar}>
                 Quitar
               </button>
@@ -538,9 +738,9 @@ function Subida({ categorias, onSubido }: { categorias: Categoria[]; onSubido: (
                 <span className="absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-brand to-cyan transition-[width]" style={{ width: `${estado.pct}%` }} />
               </span>
             )}
-            {msg && (
+            {error && (
               <span className="text-[13px] font-bold text-late" role="alert">
-                {msg}
+                {error}
               </span>
             )}
           </div>

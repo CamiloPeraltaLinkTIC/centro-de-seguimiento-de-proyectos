@@ -33,6 +33,7 @@ const ACCIONES: Record<string, { label: string; tipo: string }> = {
   migracion: { label: "Migración de datos", tipo: "crea" },
   documento_subido: { label: "Documento subido", tipo: "crea" },
   documento_visto: { label: "Documento visto", tipo: "login" },
+  documento_editado: { label: "Documento editado", tipo: "edita" },
   documento_eliminado: { label: "Documento eliminado", tipo: "elimina" },
   categoria_creada: { label: "Categoría creada", tipo: "crea" },
   categoria_editada: { label: "Categoría editada", tipo: "edita" },
@@ -59,6 +60,10 @@ const CAMPOS: Record<string, string> = {
   responsables: "Responsables",
   actividades: "Actividades",
   categoria: "Categoría",
+  titulo: "Título",
+  descripcion: "Descripción",
+  formato: "Formato",
+  archivo: "Archivo",
   tamano: "Tamaño (bytes)",
 };
 

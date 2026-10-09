@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { audit } from "@/lib/audit";
+import { audit, diff } from "@/lib/audit";
 import { BUCKET, DOC_COLS, MAX_BYTES, MAX_PORTADA, tipoDe, type TipoDocumento } from "@/lib/documentos";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/supabase/server";
@@ -97,43 +97,105 @@ export async function prepararSubida(tamano: number, tipo: TipoDocumento = "pdf"
   return { ok: true, data: { path: `${id}.${tipo}`, url, portadaPath: `${id}.jpg`, portadaUrl } };
 }
 
-/** Paso 2: verifica que el archivo sea un PDF o HTML real (y la portada un JPEG) y registra el documento. */
-export async function confirmarSubida(input: { path: string; portada: string | null; titulo: string; descripcion: string; categoria: string }): Promise<Result<Documento>> {
-  const s = await admin();
-  if (!s) return fail(SOLO_ADMIN);
+type Datos = { titulo: string; descripcion: string; categoria: string };
+
+/** Título, descripción y categoría validados (la categoría, con el nombre exacto de la tabla). */
+async function validarDatos(input: Datos): Promise<{ ok: true; data: Datos } | { ok: false; error: string }> {
   const titulo = text(input?.titulo, 200);
   const descripcion = text(input?.descripcion ?? "", 1000, false);
   const nombreCat = text(input?.categoria || GENERAL, 60);
-  if (!ARCHIVO_RE.test(String(input?.path)) || titulo === null || descripcion === null || nombreCat === null) return fail("Datos inválidos.");
-  if (input.portada !== null && (!JPG_RE.test(String(input.portada)) || input.portada.slice(0, 36) !== input.path.slice(0, 36))) return fail("Datos inválidos.");
-
+  if (titulo === null || descripcion === null || nombreCat === null) return fail("Datos inválidos.");
   const cats = await categorias();
   const categoria = cats ? cats.find((c) => c.nombre.toLowerCase() === nombreCat.toLowerCase())?.nombre : nombreCat;
   if (!categoria) return fail("La categoría no existe. Elige una de la lista.");
+  return { ok: true, data: { titulo, descripcion, categoria } };
+}
 
+/**
+ * Verifica un archivo recién subido (PDF o HTML real, y la portada un JPEG). Si el archivo no sirve, lo borra.
+ * Una portada inválida solo se descarta.
+ */
+async function verificarArchivo(path: string, portadaPath: string | null): Promise<Result<{ archivo: string; portada: string | null; tamano: number }>> {
+  if (!ARCHIVO_RE.test(String(path))) return fail("Datos inválidos.");
+  if (portadaPath !== null && (!JPG_RE.test(String(portadaPath)) || portadaPath.slice(0, 36) !== path.slice(0, 36))) return fail("Datos inválidos.");
   const storage = db().storage.from(BUCKET);
-  const html = tipoDe(input.path) === "html";
-  const archivo = await cabecera(input.path, html ? 4096 : 8);
+  const html = tipoDe(path) === "html";
+  const archivo = await cabecera(path, html ? 4096 : 8);
   if (!(html ? esHtml(archivo) : esPdf(archivo))) {
-    await storage.remove([input.path, ...(input.portada ? [input.portada] : [])]);
+    await storage.remove([path, ...(portadaPath ? [portadaPath] : [])]);
     return fail(html ? "El archivo no es un HTML válido." : "El archivo no es un PDF válido.");
   }
   let portada: string | null = null;
-  if (input.portada) {
-    if (esJpeg(await cabecera(input.portada))) portada = input.portada;
-    else await storage.remove([input.portada]);
+  if (portadaPath) {
+    if (esJpeg(await cabecera(portadaPath))) portada = portadaPath;
+    else await storage.remove([portadaPath]);
   }
+  return { ok: true, data: { archivo: path, portada, tamano: archivo!.total } };
+}
+
+/** Paso 2: verifica el archivo y registra el documento. */
+export async function confirmarSubida(input: Datos & { path: string; portada: string | null }): Promise<Result<Documento>> {
+  const s = await admin();
+  if (!s) return fail(SOLO_ADMIN);
+  const datos = await validarDatos(input);
+  if (!datos.ok) return datos;
+  const f = await verificarArchivo(input?.path, input?.portada ?? null);
+  if (!f.ok) return f;
 
   const { data, error } = await db()
     .from("documentos")
-    .insert({ titulo, descripcion, categoria, archivo: input.path, portada, tamano: archivo!.total, subido_por: s.user })
+    .insert({ ...datos.data, ...f.data, subido_por: s.user })
     .select(DOC_COLS)
     .single();
   if (error || !data) {
-    await storage.remove([input.path, ...(portada ? [portada] : [])]);
+    await db().storage.from(BUCKET).remove([f.data.archivo, ...(f.data.portada ? [f.data.portada] : [])]);
     return fail();
   }
-  await audit({ usuario: s.user, rol: s.role, accion: "documento_subido", entidad: "documento", entidadId: data.id, resumen: titulo, detalle: { categoria, tamano: archivo!.total, formato: tipoDe(input.path) } });
+  const { titulo, categoria } = datos.data;
+  await audit({ usuario: s.user, rol: s.role, accion: "documento_subido", entidad: "documento", entidadId: data.id, resumen: titulo, detalle: { categoria, tamano: f.data.tamano, formato: tipoDe(f.data.archivo) } });
+  return { ok: true, data: data as Documento };
+}
+
+/* ---------- edición (solo administradores) ---------- */
+
+/**
+ * Cambia título, descripción y categoría y, si se envía `nuevo`, reemplaza el archivo (PDF o HTML, puede cambiar de formato).
+ * El archivo nuevo se sube antes con `prepararSubida`; el anterior y su portada se borran del bucket.
+ */
+export async function editarDocumento(id: string, input: Datos & { nuevo: { path: string; portada: string | null } | null }): Promise<Result<Documento>> {
+  const s = await admin();
+  if (!s) return fail("Solo los administradores pueden editar documentos.");
+  if (!UUID.test(id)) return fail("Datos inválidos.");
+  const { data: antes } = await db().from("documentos").select(DOC_COLS).eq("id", id).is("eliminado_at", null).maybeSingle();
+  const descartar = () => input?.nuevo && db().storage.from(BUCKET).remove([input.nuevo.path, ...(input.nuevo.portada ? [input.nuevo.portada] : [])]);
+  if (!antes) {
+    if (input?.nuevo && ARCHIVO_RE.test(String(input.nuevo.path))) await descartar();
+    return fail("El documento no existe.");
+  }
+  const datos = await validarDatos(input);
+  if (!datos.ok) return datos;
+
+  let cambios: Datos & { archivo?: string; portada?: string | null; tamano?: number } = { ...datos.data };
+  if (input.nuevo) {
+    if (input.nuevo.path === antes.archivo) return fail("Datos inválidos.");
+    const f = await verificarArchivo(input.nuevo.path, input.nuevo.portada ?? null);
+    if (!f.ok) return f;
+    cambios = { ...cambios, ...f.data };
+  }
+
+  const { data, error } = await db().from("documentos").update(cambios).eq("id", id).select(DOC_COLS).single();
+  if (error || !data) {
+    if (input.nuevo) await descartar();
+    return fail();
+  }
+  if (input.nuevo) await db().storage.from(BUCKET).remove([antes.archivo, ...(antes.portada ? [antes.portada] : [])]);
+
+  const detalle = diff(
+    { titulo: antes.titulo, descripcion: antes.descripcion, categoria: antes.categoria, formato: tipoDe(antes.archivo), tamano: antes.tamano },
+    { titulo: data.titulo, descripcion: data.descripcion, categoria: data.categoria, ...(input.nuevo ? { formato: tipoDe(data.archivo), tamano: data.tamano } : {}) },
+  );
+  if (input.nuevo) detalle.archivo = { antes: "anterior", despues: "reemplazado" };
+  if (Object.keys(detalle).length) await audit({ usuario: s.user, rol: s.role, accion: "documento_editado", entidad: "documento", entidadId: id, resumen: data.titulo, detalle });
   return { ok: true, data: data as Documento };
 }
 
